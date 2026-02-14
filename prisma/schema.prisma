@@ -1,0 +1,185 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id              String    @id @default(cuid())
+  email           String    @unique
+  name            String?
+  emailVerified   DateTime?
+  image           String?
+  hashedPassword  String?
+  role            String    @default("user") // "user" | "admin"
+  balanceCents    Int       @default(0)
+  stripeCustomerId String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  accounts        Account[]
+  sessions        Session[]
+  vaultItems      VaultItem[]
+  listings        Listing[]
+  buyOrders       Order[]   @relation("BuyerOrders")
+  sellOrders      Order[]   @relation("SellerOrders")
+  submissions     VaultSubmission[]
+  watchlist       Watchlist[]
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model Sneaker {
+  id            String    @id @default(cuid())
+  brand         String
+  model         String
+  colorway      String?
+  styleCode     String?
+  retailPriceCents Int?
+  imageUrl      String?
+  releaseDate   DateTime?
+  category      String    @default("lifestyle") // "lifestyle" | "basketball" | "running" | "skateboarding"
+  createdAt     DateTime  @default(now())
+
+  vaultItems    VaultItem[]
+  priceHistory  PriceHistory[]
+  watchlist     Watchlist[]
+}
+
+model VaultItem {
+  id                   String   @id @default(cuid())
+  ownerId              String
+  sneakerId            String
+  size                 String
+  condition            String   // "deadstock" | "vnds" | "excellent" | "good"
+  status               String   @default("pending_auth")
+  // "pending_auth" | "authenticated" | "vaulted" | "listed" | "sold" | "redeemed"
+  authenticationStatus String   @default("pending")
+  // "pending" | "passed" | "failed"
+  askingPriceCents     Int?
+  vaultLocation        String?
+  imageUrls            String[]
+  notes                String?
+  vaultedAt            DateTime?
+  submissionId         String?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  owner      User            @relation(fields: [ownerId], references: [id])
+  sneaker    Sneaker         @relation(fields: [sneakerId], references: [id])
+  submission VaultSubmission? @relation(fields: [submissionId], references: [id])
+  listings   Listing[]
+  orders     Order[]
+}
+
+model Listing {
+  id          String   @id @default(cuid())
+  vaultItemId String
+  sellerId    String
+  priceCents  Int
+  status      String   @default("active") // "active" | "sold" | "cancelled"
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  vaultItem VaultItem @relation(fields: [vaultItemId], references: [id])
+  seller    User      @relation(fields: [sellerId], references: [id])
+  orders    Order[]
+}
+
+model Order {
+  id                    String   @id @default(cuid())
+  listingId             String
+  buyerId               String
+  sellerId              String
+  vaultItemId           String
+  salePriceCents        Int
+  buyerFeeCents         Int
+  sellerFeeCents        Int
+  platformRevenueCents  Int
+  stripeSessionId       String?
+  stripePaymentIntentId String?
+  status                String   @default("pending")
+  // "pending" | "paid" | "completed" | "refunded"
+  createdAt             DateTime @default(now())
+
+  listing   Listing   @relation(fields: [listingId], references: [id])
+  buyer     User      @relation("BuyerOrders", fields: [buyerId], references: [id])
+  seller    User      @relation("SellerOrders", fields: [sellerId], references: [id])
+  vaultItem VaultItem @relation(fields: [vaultItemId], references: [id])
+}
+
+model VaultSubmission {
+  id             String   @id @default(cuid())
+  userId         String
+  status         String   @default("label_created")
+  // "label_created" | "shipped" | "received" | "authenticating" | "completed" | "rejected"
+  trackingNumber String?
+  itemsExpected  Int      @default(1)
+  itemsReceived  Int?
+  notes          String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  user       User        @relation(fields: [userId], references: [id])
+  vaultItems VaultItem[]
+}
+
+model PriceHistory {
+  id         String   @id @default(cuid())
+  sneakerId  String
+  size       String
+  priceCents Int
+  source     String   @default("platform") // "platform" | "external"
+  recordedAt DateTime @default(now())
+
+  sneaker Sneaker @relation(fields: [sneakerId], references: [id])
+}
+
+model Watchlist {
+  id               String   @id @default(cuid())
+  userId           String
+  sneakerId        String
+  targetPriceCents Int?
+  createdAt        DateTime @default(now())
+
+  user    User    @relation(fields: [userId], references: [id])
+  sneaker Sneaker @relation(fields: [sneakerId], references: [id])
+
+  @@unique([userId, sneakerId])
+}
