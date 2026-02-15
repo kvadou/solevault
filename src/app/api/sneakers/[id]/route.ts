@@ -24,5 +24,33 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  return NextResponse.json(sneaker);
+  // Compute market stats from price history
+  const history = sneaker.priceHistory;
+  const lastSalePriceCents = history.length > 0 ? history[0].priceCents : null;
+  const avgSalePriceCents =
+    history.length > 0
+      ? Math.round(history.reduce((sum, h) => sum + h.priceCents, 0) / history.length)
+      : null;
+  const lowestSalePriceCents =
+    history.length > 0 ? Math.min(...history.map((h) => h.priceCents)) : null;
+  const highestSalePriceCents =
+    history.length > 0 ? Math.max(...history.map((h) => h.priceCents)) : null;
+
+  const totalSold = await prisma.order.count({
+    where: {
+      vaultItem: { sneakerId: id },
+      status: "completed",
+    },
+  });
+
+  return NextResponse.json({
+    ...sneaker,
+    marketStats: {
+      lastSalePriceCents,
+      avgSalePriceCents,
+      lowestSalePriceCents,
+      highestSalePriceCents,
+      totalSold,
+    },
+  });
 }
