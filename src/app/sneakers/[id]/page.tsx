@@ -55,6 +55,9 @@ export default function SneakerDetailPage({ params }: { params: Promise<{ id: st
   const [watching, setWatching] = useState(false);
   const [watchlistEntryId, setWatchlistEntryId] = useState<string | null>(null);
   const [watchLoading, setWatchLoading] = useState(false);
+  const [bidSize, setBidSize] = useState("");
+  const [bidAmount, setBidAmount] = useState("");
+  const [bidding, setBidding] = useState(false);
 
   useEffect(() => {
     fetch(`/api/sneakers/${id}`)
@@ -109,6 +112,34 @@ export default function SneakerDetailPage({ params }: { params: Promise<{ id: st
     } else {
       setBuying(false);
     }
+  }
+
+  async function placeBid() {
+    if (!session) { router.push("/auth/signin"); return; }
+    if (!bidSize || !bidAmount) { toast("Select a size and enter an amount", "error"); return; }
+    setBidding(true);
+    try {
+      const res = await fetch("/api/bids", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sneakerId: id,
+          size: bidSize,
+          amountCents: Math.round(parseFloat(bidAmount) * 100),
+        }),
+      });
+      if (res.ok) {
+        toast("Bid placed successfully!", "success");
+        setBidSize("");
+        setBidAmount("");
+      } else {
+        const data = await res.json();
+        toast(data.error || "Failed to place bid", "error");
+      }
+    } catch {
+      toast("Failed to place bid", "error");
+    }
+    setBidding(false);
   }
 
   if (loading) {
@@ -216,6 +247,49 @@ export default function SneakerDetailPage({ params }: { params: Promise<{ id: st
                 ))}
               </div>
             )}
+          </div>
+
+          {/* Make an Offer */}
+          <div>
+            <h2 className="text-lg font-semibold mb-3">Make an Offer</h2>
+            <p className="text-sm text-[var(--muted-foreground)] mb-3">
+              Place a bid below asking price — sellers will be notified.
+            </p>
+            <div className="flex items-end gap-3">
+              <div className="flex-1">
+                <label className="block text-xs text-[var(--muted-foreground)] mb-1">Size</label>
+                <input
+                  type="text"
+                  value={bidSize}
+                  onChange={(e) => setBidSize(e.target.value)}
+                  placeholder="e.g. 10"
+                  className="w-full rounded-md border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
+                />
+              </div>
+              <div className="flex-1">
+                <label className="block text-xs text-[var(--muted-foreground)] mb-1">Offer Amount</label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-[var(--muted-foreground)]">$</span>
+                  <input
+                    type="number"
+                    min="1"
+                    step="0.01"
+                    value={bidAmount}
+                    onChange={(e) => setBidAmount(e.target.value)}
+                    placeholder="200.00"
+                    className="w-full rounded-md border border-[var(--border)] bg-[var(--background)] pl-7 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
+                  />
+                </div>
+              </div>
+              <button
+                onClick={placeBid}
+                disabled={bidding || !bidSize || !bidAmount}
+                className="rounded-md bg-[var(--primary)] px-4 py-2 text-sm font-medium text-[var(--primary-foreground)] hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center gap-2"
+              >
+                {bidding && <Loader2 className="h-4 w-4 animate-spin" />}
+                Place Bid
+              </button>
+            </div>
           </div>
         </div>
       </div>
