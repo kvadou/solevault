@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useSession, signOut } from "next-auth/react";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { Menu, X, Vault, ShoppingBag, LayoutDashboard, LogOut, User, Wallet, Gift, Flame, Eye, Bell, PieChart } from "lucide-react";
+import { Menu, X, Vault, ShoppingBag, LayoutDashboard, LogOut, User, Wallet, Gift, Flame, Eye, Bell, PieChart, Gavel } from "lucide-react";
 import { formatPrice } from "@/lib/utils";
 import { Notification, timeAgo } from "@/lib/notifications";
 
@@ -118,6 +118,9 @@ export function Navbar() {
                 </Link>
                 <Link href="/watchlist" className="text-sm font-medium hover:text-[var(--accent)] transition-colors">
                   Watchlist
+                </Link>
+                <Link href="/bids" className="text-sm font-medium hover:text-[var(--accent)] transition-colors">
+                  My Bids
                 </Link>
                 {/* Notification Bell */}
                 <div className="relative" ref={notifRef}>
@@ -255,6 +258,9 @@ export function Navbar() {
               </Link>
               <Link href="/watchlist" className="flex items-center gap-2 text-sm py-2" onClick={() => setMobileOpen(false)}>
                 <Eye className="h-4 w-4" /> Watchlist
+              </Link>
+              <Link href="/bids" className="flex items-center gap-2 text-sm py-2" onClick={() => setMobileOpen(false)}>
+                <Gavel className="h-4 w-4" /> My Bids
               </Link>
               <Link href="/notifications" className="flex items-center gap-2 text-sm py-2" onClick={() => setMobileOpen(false)}>
                 <Bell className="h-4 w-4" /> Notifications

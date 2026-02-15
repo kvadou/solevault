@@ -100,6 +100,19 @@ export async function PATCH(
       },
     });
 
+    // Notify bidder their offer was declined
+    try {
+      await prisma.notification.create({
+        data: {
+          userId: bid.bidderId,
+          type: "bid_declined",
+          title: "Offer Declined",
+          message: `Your offer of $${(bid.amountCents / 100).toFixed(2)} for ${bid.sneaker.brand} ${bid.sneaker.model} was declined`,
+          link: `/sneakers/${bid.sneakerId}`,
+        },
+      });
+    } catch {}
+
     return NextResponse.json(updated);
   }
 
@@ -241,6 +254,19 @@ export async function PATCH(
       source: "platform",
     },
   });
+
+  // Notify bidder their offer was accepted
+  try {
+    await prisma.notification.create({
+      data: {
+        userId: bid.bidderId,
+        type: "bid_accepted",
+        title: "Offer Accepted!",
+        message: `Your offer of $${(bid.amountCents / 100).toFixed(2)} for ${bid.sneaker.brand} ${bid.sneaker.model} was accepted`,
+        link: "/vault",
+      },
+    });
+  } catch {}
 
   return NextResponse.json(updatedBid);
 }
