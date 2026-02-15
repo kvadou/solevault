@@ -12,7 +12,8 @@ export async function PATCH(
   }
 
   const { id } = await params;
-  const { read } = await req.json();
+  const body = await req.json();
+  const read = typeof body.read === "boolean" ? body.read : true;
 
   const notification = await prisma.notification.findUnique({
     where: { id },

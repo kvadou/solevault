@@ -6,24 +6,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Menu, X, Vault, ShoppingBag, LayoutDashboard, LogOut, User, Wallet, Gift, Flame, Eye, Bell, PieChart } from "lucide-react";
 import { formatPrice } from "@/lib/utils";
-
-interface Notification {
-  id: string;
-  type: string;
-  title: string;
-  message: string;
-  link: string | null;
-  read: boolean;
-  createdAt: string;
-}
-
-function timeAgo(date: string): string {
-  const seconds = Math.floor((Date.now() - new Date(date).getTime()) / 1000);
-  if (seconds < 60) return "just now";
-  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
-  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
-  return `${Math.floor(seconds / 86400)}d ago`;
-}
+import { Notification, timeAgo } from "@/lib/notifications";
 
 export function Navbar() {
   const { data: session } = useSession();
@@ -59,11 +42,11 @@ export function Navbar() {
   }, [session]);
 
   useEffect(() => {
+    if (!session?.user) return;
     fetchNotifications();
-    // Poll every 30 seconds for new notifications
     const interval = setInterval(fetchNotifications, 30000);
     return () => clearInterval(interval);
-  }, [fetchNotifications]);
+  }, [fetchNotifications, session]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -79,14 +62,16 @@ export function Navbar() {
   }, [notifOpen]);
 
   async function markAsRead(id: string) {
-    await fetch(`/api/notifications/${id}`, {
+    const res = await fetch(`/api/notifications/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ read: true }),
-    }).catch(() => {});
-    setNotifications((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, read: true } : n))
-    );
+    }).catch(() => null);
+    if (res?.ok) {
+      setNotifications((prev) =>
+        prev.map((n) => (n.id === id ? { ...n, read: true } : n))
+      );
+    }
   }
 
   async function markAllAsRead() {
