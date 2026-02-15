@@ -35,7 +35,7 @@ export async function GET() {
     level: computedLevel,
     label: SELLER_LEVELS[computedLevel].label,
     color: SELLER_LEVELS[computedLevel].color,
-    feePercent,
+    feePercent, // seller portion only — buyer always pays an additional 2.5%
     totalSales: user.totalSales,
     authPassRate: user.authPassRate,
     nextLevel: nextLevel ? {

@@ -1,8 +1,8 @@
 export const SELLER_LEVELS = {
-  bronze: { minSales: 0, feePercent: 5.0, label: "Bronze", color: "amber" },
-  silver: { minSales: 10, feePercent: 4.0, label: "Silver", color: "gray" },
-  gold: { minSales: 50, feePercent: 3.5, label: "Gold", color: "yellow" },
-  platinum: { minSales: 200, feePercent: 3.0, label: "Platinum", color: "purple" },
+  bronze: { minSales: 0, feePercent: 2.5, label: "Bronze", color: "amber" },
+  silver: { minSales: 10, feePercent: 1.5, label: "Silver", color: "gray" },
+  gold: { minSales: 50, feePercent: 1.0, label: "Gold", color: "yellow" },
+  platinum: { minSales: 200, feePercent: 0.5, label: "Platinum", color: "purple" },
 } as const;
 
 export type SellerLevel = keyof typeof SELLER_LEVELS;

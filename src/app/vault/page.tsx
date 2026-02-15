@@ -506,7 +506,7 @@ export default function VaultPage() {
               />
               {listPrice && (
                 <p className="text-xs text-[var(--muted-foreground)] mt-1">
-                  You&apos;ll receive {formatPrice(Math.round(parseFloat(listPrice) * 100 * (1 - (sellerLevel?.feePercent ?? 5) / 100)))} after {sellerLevel?.feePercent ?? 5}% seller fee
+                  You&apos;ll receive {formatPrice(Math.round(parseFloat(listPrice) * 100 * (1 - (sellerLevel?.feePercent ?? 2.5) / 100)))} after {sellerLevel?.feePercent ?? 2.5}% seller fee
                   {sellerLevel && sellerLevel.level !== "bronze" && (
                     <span className="ml-1 text-green-600">({sellerLevel.label} rate)</span>
                   )}
