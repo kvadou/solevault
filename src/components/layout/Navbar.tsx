@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useSession, signOut } from "next-auth/react";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { Menu, X, Vault, ShoppingBag, LayoutDashboard, LogOut, User, Wallet, Gift, Flame, Eye, Bell, PieChart, Gavel } from "lucide-react";
+import { Menu, X, Vault, ShoppingBag, LayoutDashboard, LogOut, User, Wallet, Gift, Flame, Eye, Bell, PieChart, Gavel, Calendar } from "lucide-react";
 import { formatPrice } from "@/lib/utils";
 import { Notification, timeAgo } from "@/lib/notifications";
 
@@ -104,6 +104,9 @@ export function Navbar() {
             </Link>
             <Link href="/drops" className="text-sm font-medium hover:text-[var(--accent)] transition-colors">
               Drops
+            </Link>
+            <Link href="/releases" className="text-sm font-medium hover:text-[var(--accent)] transition-colors">
+              Releases
             </Link>
             {session && (
               <>
@@ -244,6 +247,9 @@ export function Navbar() {
           </Link>
           <Link href="/drops" className="flex items-center gap-2 text-sm py-2" onClick={() => setMobileOpen(false)}>
             <Flame className="h-4 w-4" /> Drops
+          </Link>
+          <Link href="/releases" className="flex items-center gap-2 text-sm py-2" onClick={() => setMobileOpen(false)}>
+            <Calendar className="h-4 w-4" /> Releases
           </Link>
           {session && (
             <>

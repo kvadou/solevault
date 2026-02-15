@@ -5,7 +5,7 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import { Loader2, Plus, Tag, PackageOpen, DollarSign, Shield, TrendingUp, ChevronDown, ChevronUp } from "lucide-react";
+import { Loader2, Plus, Tag, PackageOpen, DollarSign, Shield, TrendingUp, ChevronDown, ChevronUp, Award } from "lucide-react";
 import { toast } from "@/components/ui/Toast";
 import { Badge } from "@/components/ui/Badge";
 import { Modal } from "@/components/ui/Modal";
@@ -55,6 +55,15 @@ interface VaultedItemRevenue {
   revenue: { totalRevenueCents: number; totalShareCents: number; tradeCount: number };
 }
 
+interface SellerLevelInfo {
+  level: string;
+  label: string;
+  color: string;
+  feePercent: number;
+  totalSales: number;
+  nextLevel: { level: string; label: string; salesNeeded: number } | null;
+}
+
 interface IncomingBid {
   id: string;
   sneakerId: string;
@@ -86,6 +95,7 @@ export default function VaultPage() {
   const [bidActionId, setBidActionId] = useState<string | null>(null);
   const [pricingGuidance, setPricingGuidance] = useState<PricingGuidance | null>(null);
   const [pricingLoading, setPricingLoading] = useState(false);
+  const [sellerLevel, setSellerLevel] = useState<SellerLevelInfo | null>(null);
 
   useEffect(() => {
     if (status === "unauthenticated") router.push("/auth/signin");
@@ -106,6 +116,10 @@ export default function VaultPage() {
       fetch("/api/bids?role=seller")
         .then((r) => r.json())
         .then((data) => { if (Array.isArray(data)) setIncomingBids(data); })
+        .catch(() => {});
+      fetch("/api/seller-level")
+        .then((r) => r.ok ? r.json() : null)
+        .then((data) => setSellerLevel(data))
         .catch(() => {});
     }
   }, [session]);
@@ -229,6 +243,53 @@ export default function VaultPage() {
           Vault a Pair
         </Link>
       </div>
+
+      {/* Seller Level */}
+      {sellerLevel && (
+        <div className="mb-8 rounded-lg border border-[var(--border)] p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${
+                sellerLevel.color === "amber" ? "bg-amber-100 text-amber-600" :
+                sellerLevel.color === "gray" ? "bg-gray-200 text-gray-600" :
+                sellerLevel.color === "yellow" ? "bg-yellow-100 text-yellow-600" :
+                "bg-purple-100 text-purple-600"
+              }`}>
+                <Award className="h-5 w-5" />
+              </div>
+              <div>
+                <h3 className="font-semibold">{sellerLevel.label} Seller</h3>
+                <p className="text-sm text-[var(--muted-foreground)]">
+                  {sellerLevel.totalSales} sale{sellerLevel.totalSales !== 1 ? "s" : ""} · {sellerLevel.feePercent}% fees
+                </p>
+              </div>
+            </div>
+            {sellerLevel.nextLevel && (
+              <div className="text-right">
+                <p className="text-sm font-medium">{sellerLevel.nextLevel.salesNeeded} more sale{sellerLevel.nextLevel.salesNeeded !== 1 ? "s" : ""}</p>
+                <p className="text-xs text-[var(--muted-foreground)]">to reach {sellerLevel.nextLevel.label}</p>
+              </div>
+            )}
+          </div>
+          {sellerLevel.nextLevel && (
+            <div className="mt-3">
+              <div className="h-2 rounded-full bg-[var(--muted)] overflow-hidden">
+                <div
+                  className={`h-full rounded-full ${
+                    sellerLevel.color === "amber" ? "bg-amber-500" :
+                    sellerLevel.color === "gray" ? "bg-gray-500" :
+                    sellerLevel.color === "yellow" ? "bg-yellow-500" :
+                    "bg-purple-500"
+                  }`}
+                  style={{
+                    width: `${Math.min(100, ((sellerLevel.totalSales) / (sellerLevel.totalSales + sellerLevel.nextLevel.salesNeeded)) * 100)}%`,
+                  }}
+                />
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Revenue Share Section */}
       {revShareSummary && revShareSummary.totalEarnedCents > 0 && (
