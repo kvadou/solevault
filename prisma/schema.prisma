@@ -21,6 +21,10 @@ model User {
   sellerLevel       String    @default("bronze") // "bronze" | "silver" | "gold" | "platinum"
   totalSales        Int       @default(0)
   authPassRate      Float?
+  trustScore              Int?
+  trustTotalVerified      Int       @default(0)
+  trustDisputeRate        Float?
+  trustLastCalculatedAt   DateTime?
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
@@ -42,6 +46,7 @@ model User {
   bids                 Bid[]                  @relation("BidderBids")
   notifications        Notification[]
   releaseReminders     ReleaseReminder[]
+  conditionReports     ConditionReport[]
 }
 
 model Account {
@@ -96,6 +101,7 @@ model Sneaker {
   watchlist     Watchlist[]
   bids          Bid[]
   releases      Release[]
+  certificates  AuthenticationCertificate[]
 }
 
 model VaultItem {
@@ -131,6 +137,8 @@ model VaultItem {
   authReport          AuthenticationReport?
   ownershipHistory    OwnershipRecord[]
   bids                Bid[]
+  certificates        AuthenticationCertificate[]
+  conditionReports    ConditionReport[]
 }
 
 model Listing {
@@ -351,6 +359,44 @@ model AuthPhoto {
   report AuthenticationReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
 
   @@index([reportId])
+}
+
+model AuthenticationCertificate {
+  id               String    @id @default(cuid())
+  vaultItemId      String
+  sneakerId        String
+  provider         String    @default("entrupy") // "entrupy" | "manual"
+  externalCertId   String?
+  confidenceScore  Int?      // 0-100
+  status           String    @default("pending") // "pending" | "verified" | "needs_review" | "failed"
+  imageUrls        String[]
+  resultData       Json?
+  verifiedAt       DateTime?
+  expiresAt        DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  vaultItem VaultItem @relation(fields: [vaultItemId], references: [id])
+  sneaker   Sneaker   @relation(fields: [sneakerId], references: [id])
+
+  @@index([vaultItemId])
+  @@index([status])
+}
+
+model ConditionReport {
+  id          String   @id @default(cuid())
+  vaultItemId String
+  reporterId  String
+  condition   String   // "new" | "like_new" | "excellent" | "good" | "fair"
+  notes       String?
+  photoUrls   String[]
+  context     String   // "listing" | "transfer" | "check_in"
+  createdAt   DateTime @default(now())
+
+  vaultItem VaultItem @relation(fields: [vaultItemId], references: [id])
+  reporter  User      @relation(fields: [reporterId], references: [id])
+
+  @@index([vaultItemId])
 }
 
 model OwnershipRecord {
