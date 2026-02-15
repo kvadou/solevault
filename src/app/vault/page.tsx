@@ -5,7 +5,7 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import { Loader2, Plus, Tag, PackageOpen, DollarSign, Shield, TrendingUp, ChevronDown, ChevronUp, Award } from "lucide-react";
+import { Loader2, Plus, Tag, PackageOpen, DollarSign, Shield, ShieldCheck, TrendingUp, ChevronDown, ChevronUp, Award } from "lucide-react";
 import { toast } from "@/components/ui/Toast";
 import { Badge } from "@/components/ui/Badge";
 import { Modal } from "@/components/ui/Modal";
@@ -96,6 +96,15 @@ export default function VaultPage() {
   const [pricingGuidance, setPricingGuidance] = useState<PricingGuidance | null>(null);
   const [pricingLoading, setPricingLoading] = useState(false);
   const [sellerLevel, setSellerLevel] = useState<SellerLevelInfo | null>(null);
+  const [trustData, setTrustData] = useState<{
+    trustScore: number | null;
+    trustTierLabel: string;
+    totalVerified: number;
+    authPassRate: number | null;
+    disputeRate: number | null;
+  } | null>(null);
+  const [listCondition, setListCondition] = useState("excellent");
+  const [listConditionNotes, setListConditionNotes] = useState("");
 
   useEffect(() => {
     if (status === "unauthenticated") router.push("/auth/signin");
@@ -120,6 +129,10 @@ export default function VaultPage() {
       fetch("/api/seller-level")
         .then((r) => r.ok ? r.json() : null)
         .then((data) => setSellerLevel(data))
+        .catch(() => {});
+      fetch("/api/trust/" + session.user?.id)
+        .then((r) => r.ok ? r.json() : null)
+        .then((d) => d && setTrustData(d))
         .catch(() => {});
     }
   }, [session]);
@@ -147,8 +160,25 @@ export default function VaultPage() {
     });
 
     if (res.ok) {
+      // Submit condition report
+      try {
+        await fetch("/api/verify/condition-report", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            vaultItemId: listModal.id,
+            condition: listCondition,
+            notes: listConditionNotes || undefined,
+            context: "listing",
+          }),
+        });
+      } catch {
+        // Don't break listing flow if condition report fails
+      }
       setListModal(null);
       setListPrice("");
+      setListCondition("excellent");
+      setListConditionNotes("");
       const data = await fetch("/api/vault").then((r) => r.json());
       setItems(data);
     }
@@ -288,6 +318,43 @@ export default function VaultPage() {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Trust Score Widget */}
+      {trustData && trustData.trustScore !== null && (
+        <div className="mb-8 rounded-lg border border-[var(--border)] p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-green-100">
+                <ShieldCheck className="h-5 w-5 text-green-600" />
+              </div>
+              <div>
+                <h3 className="font-semibold">Trust Score</h3>
+                <p className="text-sm text-[var(--muted-foreground)]">
+                  {trustData.trustTierLabel} · {trustData.totalVerified} verified
+                </p>
+              </div>
+            </div>
+            <div className="text-right">
+              <p className="text-2xl font-bold">{trustData.trustScore}</p>
+              <p className="text-xs text-[var(--muted-foreground)]">/100</p>
+            </div>
+          </div>
+          <div className="mt-3 grid grid-cols-3 gap-3">
+            <div className="text-center">
+              <p className="text-lg font-semibold">{trustData.authPassRate != null ? `${trustData.authPassRate}%` : "—"}</p>
+              <p className="text-[10px] text-[var(--muted-foreground)]">Auth Pass Rate</p>
+            </div>
+            <div className="text-center">
+              <p className="text-lg font-semibold">{trustData.totalVerified}</p>
+              <p className="text-[10px] text-[var(--muted-foreground)]">Verified Items</p>
+            </div>
+            <div className="text-center">
+              <p className="text-lg font-semibold">{trustData.disputeRate != null ? `${trustData.disputeRate}%` : "0%"}</p>
+              <p className="text-[10px] text-[var(--muted-foreground)]">Dispute Rate</p>
+            </div>
+          </div>
         </div>
       )}
 
@@ -469,7 +536,7 @@ export default function VaultPage() {
       {/* List for sale modal */}
       <Modal
         open={!!listModal}
-        onClose={() => { if (!listing) setListModal(null); }}
+        onClose={() => { if (!listing) { setListModal(null); setListCondition("excellent"); setListConditionNotes(""); } }}
         title="List for Sale"
       >
         {listModal && (
@@ -513,9 +580,31 @@ export default function VaultPage() {
                 </p>
               )}
             </div>
+            {/* Condition Report */}
+            <div className="space-y-2">
+              <label className="block text-sm font-medium">Condition at Listing</label>
+              <select
+                value={listCondition}
+                onChange={(e) => setListCondition(e.target.value)}
+                className="w-full rounded-md border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
+              >
+                <option value="new">New</option>
+                <option value="like_new">Like New</option>
+                <option value="excellent">Excellent</option>
+                <option value="good">Good</option>
+                <option value="fair">Fair</option>
+              </select>
+              <input
+                type="text"
+                value={listConditionNotes}
+                onChange={(e) => setListConditionNotes(e.target.value)}
+                placeholder="Any notes about condition (optional)"
+                className="w-full rounded-md border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
+              />
+            </div>
             <div className="flex gap-3">
               <button
-                onClick={() => setListModal(null)}
+                onClick={() => { setListModal(null); setListCondition("excellent"); setListConditionNotes(""); }}
                 disabled={listing}
                 className="flex-1 rounded-md border border-[var(--border)] py-2 text-sm font-medium hover:bg-[var(--muted)] transition-colors disabled:opacity-50"
               >
