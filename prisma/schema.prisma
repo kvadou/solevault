@@ -139,6 +139,7 @@ model VaultItem {
   bids                Bid[]
   certificates        AuthenticationCertificate[]
   conditionReports    ConditionReport[]
+  nfcTags             NfcTag[]
 }
 
 model Listing {
@@ -397,6 +398,21 @@ model ConditionReport {
   reporter  User      @relation(fields: [reporterId], references: [id])
 
   @@index([vaultItemId])
+}
+
+model NfcTag {
+  id          String    @id @default(cuid())
+  vaultItemId String?
+  tagUid      String    @unique
+  tagType     String    @default("nfc") // "nfc" | "qr"
+  status      String    @default("unassigned") // "unassigned" | "active" | "deactivated"
+  purchaseId  String?   // Stripe payment reference
+  assignedAt  DateTime?
+  createdAt   DateTime  @default(now())
+
+  vaultItem VaultItem? @relation(fields: [vaultItemId], references: [id])
+
+  @@index([status])
 }
 
 model OwnershipRecord {
