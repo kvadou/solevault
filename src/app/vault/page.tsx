@@ -47,6 +47,18 @@ interface VaultedItemRevenue {
   revenue: { totalRevenueCents: number; totalShareCents: number; tradeCount: number };
 }
 
+interface IncomingBid {
+  id: string;
+  sneakerId: string;
+  size: string;
+  amountCents: number;
+  status: string;
+  expiresAt: string;
+  createdAt: string;
+  sneaker: { brand: string; model: string; colorway: string | null; imageUrl: string | null };
+  bidder: { name: string | null };
+}
+
 export default function VaultPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
@@ -62,6 +74,8 @@ export default function VaultPage() {
   const [revShareSummary, setRevShareSummary] = useState<RevenueShareSummary | null>(null);
   const [revShareItems, setRevShareItems] = useState<VaultedItemRevenue[]>([]);
   const [showRevShare, setShowRevShare] = useState(false);
+  const [incomingBids, setIncomingBids] = useState<IncomingBid[]>([]);
+  const [bidActionId, setBidActionId] = useState<string | null>(null);
 
   useEffect(() => {
     if (status === "unauthenticated") router.push("/auth/signin");
@@ -78,6 +92,10 @@ export default function VaultPage() {
           setRevShareSummary(data.summary);
           setRevShareItems(data.vaultedItems || []);
         })
+        .catch(() => {});
+      fetch("/api/bids?role=seller")
+        .then((r) => r.json())
+        .then((data) => { if (Array.isArray(data)) setIncomingBids(data); })
         .catch(() => {});
     }
   }, [session]);
@@ -138,6 +156,32 @@ export default function VaultPage() {
       toast(data.error || "Buyback failed", "error");
     }
     setBuybackExecuting(false);
+  }
+
+  async function handleBidAction(bidId: string, action: "accept" | "decline") {
+    setBidActionId(bidId);
+    try {
+      const res = await fetch(`/api/bids/${bidId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action }),
+      });
+      if (res.ok) {
+        toast(action === "accept" ? "Bid accepted! Ownership transferred." : "Bid declined", "success");
+        setIncomingBids((prev) => prev.filter((b) => b.id !== bidId));
+        if (action === "accept") {
+          // Refresh vault items since one was sold
+          const refreshed = await fetch("/api/vault").then((r) => r.json());
+          setItems(refreshed);
+        }
+      } else {
+        const data = await res.json();
+        toast(data.error || `Failed to ${action} bid`, "error");
+      }
+    } catch {
+      toast(`Failed to ${action} bid`, "error");
+    }
+    setBidActionId(null);
   }
 
   if (loading) {
@@ -218,6 +262,49 @@ export default function VaultPage() {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Incoming Bids */}
+      {incomingBids.length > 0 && (
+        <div className="mb-8 rounded-lg border border-[var(--border)] overflow-hidden">
+          <div className="p-4 border-b border-[var(--border)]">
+            <h3 className="font-semibold">Incoming Offers ({incomingBids.length})</h3>
+            <p className="text-sm text-[var(--muted-foreground)]">Bids from buyers on your vaulted sneakers</p>
+          </div>
+          <div className="divide-y divide-[var(--border)]">
+            {incomingBids.map((bid) => (
+              <div key={bid.id} className="flex items-center justify-between p-4">
+                <div className="flex items-center gap-3">
+                  <div>
+                    <p className="font-medium text-sm">
+                      {bid.sneaker.brand} {bid.sneaker.model}
+                    </p>
+                    <p className="text-xs text-[var(--muted-foreground)]">
+                      Size {bid.size} &middot; from {bid.bidder.name || "Anonymous"} &middot; expires {new Date(bid.expiresAt).toLocaleDateString()}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="text-lg font-bold text-[var(--accent)]">{formatPrice(bid.amountCents)}</span>
+                  <button
+                    onClick={() => handleBidAction(bid.id, "accept")}
+                    disabled={bidActionId === bid.id}
+                    className="rounded-md bg-green-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-green-700 transition-colors disabled:opacity-50"
+                  >
+                    {bidActionId === bid.id ? "..." : "Accept"}
+                  </button>
+                  <button
+                    onClick={() => handleBidAction(bid.id, "decline")}
+                    disabled={bidActionId === bid.id}
+                    className="rounded-md border border-[var(--border)] px-3 py-1.5 text-sm font-medium text-[var(--muted-foreground)] hover:text-red-600 hover:border-red-300 transition-colors disabled:opacity-50"
+                  >
+                    Decline
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 

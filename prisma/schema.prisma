@@ -36,6 +36,8 @@ model User {
   authenticatorReports AuthenticationReport[] @relation("AuthenticatorReports")
   ownershipFrom        OwnershipRecord[]      @relation("OwnershipFrom")
   ownershipTo          OwnershipRecord[]      @relation("OwnershipTo")
+  bids                 Bid[]                  @relation("BidderBids")
+  notifications        Notification[]
 }
 
 model Account {
@@ -88,6 +90,7 @@ model Sneaker {
   vaultItems    VaultItem[]
   priceHistory  PriceHistory[]
   watchlist     Watchlist[]
+  bids          Bid[]
 }
 
 model VaultItem {
@@ -122,6 +125,7 @@ model VaultItem {
   revenueShares       RevenueShare[]
   authReport          AuthenticationReport?
   ownershipHistory    OwnershipRecord[]
+  bids                Bid[]
 }
 
 model Listing {
@@ -378,4 +382,40 @@ model RevenueShare {
 
   @@index([vaulterId, status])
   @@index([vaultItemId])
+}
+
+model Bid {
+  id          String    @id @default(cuid())
+  sneakerId   String
+  bidderId    String
+  size        String
+  amountCents Int
+  status      String    @default("active") // "active" | "accepted" | "countered" | "declined" | "expired" | "cancelled"
+  expiresAt   DateTime
+  vaultItemId String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  sneaker   Sneaker    @relation(fields: [sneakerId], references: [id])
+  bidder    User       @relation("BidderBids", fields: [bidderId], references: [id])
+  vaultItem VaultItem? @relation(fields: [vaultItemId], references: [id])
+
+  @@index([sneakerId, status])
+  @@index([bidderId, createdAt])
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  type      String   // "price_alert" | "bid_received" | "bid_accepted" | "bid_declined" | "order_completed"
+  title     String
+  message   String
+  link      String?  // URL to navigate to on click
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, read])
+  @@index([userId, createdAt])
 }
