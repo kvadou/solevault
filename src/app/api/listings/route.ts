@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
+import { getTrustTier, getMaxActiveListings } from "@/lib/trust-score";
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
@@ -48,7 +49,7 @@ export async function GET(req: Request) {
       vaultItem: {
         include: {
           sneaker: true,
-          owner: { select: { id: true, name: true, sellerLevel: true } },
+          owner: { select: { id: true, name: true, sellerLevel: true, trustScore: true } },
           certificates: {
             where: { status: "verified" },
             select: { id: true, confidenceScore: true },
@@ -69,6 +70,34 @@ export async function POST(req: Request) {
   const session = await auth();
   if (!session?.user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  // Trust score enforcement
+  const sellerUser = await prisma.user.findUnique({
+    where: { id: session.user.id! },
+    select: { trustScore: true },
+  });
+
+  const tier = getTrustTier(sellerUser?.trustScore ?? null);
+
+  if (tier === "suspended") {
+    return NextResponse.json(
+      { error: "Your account is suspended due to a low trust score. Please contact support." },
+      { status: 403 }
+    );
+  }
+
+  const maxListings = getMaxActiveListings(tier);
+  if (maxListings !== null) {
+    const activeCount = await prisma.listing.count({
+      where: { sellerId: session.user.id!, status: "active" },
+    });
+    if (activeCount >= maxListings) {
+      return NextResponse.json(
+        { error: `You can only have ${maxListings} active listings with your current trust score.` },
+        { status: 403 }
+      );
+    }
   }
 
   const { vaultItemId, priceCents } = await req.json();

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ShieldCheck } from "lucide-react";
 import { formatPrice, conditionLabel } from "@/lib/utils";
 import { SellerBadge } from "@/components/ui/SellerBadge";
+import { TrustBadge } from "@/components/ui/TrustBadge";
 import type { SellerLevel } from "@/lib/seller-levels";
 
 interface ListingCardProps {
@@ -21,6 +22,7 @@ interface ListingCardProps {
         id: string;
         name: string | null;
         sellerLevel?: string;
+        trustScore?: number | null;
       };
       sneaker: {
         id: string;
@@ -68,9 +70,14 @@ export function ListingCard({ listing }: ListingCardProps) {
       <div className="p-3 space-y-1">
         <div className="flex items-center justify-between">
           <p className="text-xs text-[var(--muted-foreground)] uppercase tracking-wide">{sneaker.brand}</p>
-          {vaultItem.owner?.sellerLevel && (
-            <SellerBadge level={vaultItem.owner.sellerLevel as SellerLevel} />
-          )}
+          <div className="flex items-center gap-1">
+            {vaultItem.owner?.trustScore != null && (
+              <TrustBadge score={vaultItem.owner.trustScore} />
+            )}
+            {vaultItem.owner?.sellerLevel && (
+              <SellerBadge level={vaultItem.owner.sellerLevel as SellerLevel} />
+            )}
+          </div>
         </div>
         <p className="text-sm font-medium truncate">{sneaker.model}</p>
         {sneaker.colorway && (
