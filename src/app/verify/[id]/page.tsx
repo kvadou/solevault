@@ -45,7 +45,7 @@ interface TrustProfileData {
   };
   sellerTrust: {
     sellerLevel: string;
-    trustScore: number;
+    trustScore: number | null;
     totalVerified: number;
     anonymizedName: string;
   };
@@ -73,10 +73,13 @@ interface TrustProfileData {
 
 function conditionLabel(c: string) {
   const map: Record<string, string> = {
+    new: "New",
+    like_new: "Like New",
     deadstock: "Deadstock (DS)",
     vnds: "Very Near Deadstock",
     excellent: "Excellent",
     good: "Good",
+    fair: "Fair",
   };
   return map[c] || c;
 }
@@ -450,12 +453,14 @@ export default function TrustProfilePage({
                 {sellerLevelLabel(sellerTrust.sellerLevel)}
               </span>
             </div>
-            <div className="flex items-center justify-between px-4 py-3">
-              <span className="text-sm text-[var(--muted-foreground)]">
-                Trust Score
-              </span>
-              <span className="text-sm font-medium">{sellerTrust.trustScore}</span>
-            </div>
+            {sellerTrust.trustScore !== null && (
+              <div className="flex items-center justify-between px-4 py-3">
+                <span className="text-sm text-[var(--muted-foreground)]">
+                  Trust Score
+                </span>
+                <span className="text-sm font-medium">{sellerTrust.trustScore}/100</span>
+              </div>
+            )}
             <div className="flex items-center justify-between px-4 py-3">
               <span className="text-sm text-[var(--muted-foreground)]">
                 Certificate ID
