@@ -24,6 +24,8 @@ export async function GET(
     },
   });
 
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://solevault.com";
+
   if (nfcTag) {
     if (nfcTag.status === "deactivated") {
       return NextResponse.json(
@@ -37,7 +39,6 @@ export async function GET(
     }
 
     const certificate = nfcTag.vaultItem.certificates[0];
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://solevault.com";
     if (certificate) {
       return NextResponse.redirect(`${baseUrl}/verify/${certificate.id}`);
     }
@@ -54,6 +55,5 @@ export async function GET(
     return NextResponse.json({ error: "Unknown tag" }, { status: 404 });
   }
 
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://solevault.com";
   return NextResponse.redirect(`${baseUrl}/certificate/${item.id}`);
 }

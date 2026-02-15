@@ -5,6 +5,7 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Loader2, Smartphone, QrCode, Shield, Minus, Plus } from "lucide-react";
 import { formatPrice } from "@/lib/utils";
+import { toast } from "@/components/ui/Toast";
 
 const TAGS = [
   {
@@ -41,16 +42,22 @@ export default function NfcPurchasePage() {
     }
     setPurchasing(true);
 
-    const res = await fetch("/api/nfc/purchase", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ tagType: selectedType, quantity }),
-    });
+    try {
+      const res = await fetch("/api/nfc/purchase", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tagType: selectedType, quantity }),
+      });
 
-    const data = await res.json();
-    if (data.checkoutUrl) {
-      window.location.href = data.checkoutUrl;
-    } else {
+      const data = await res.json();
+      if (data.checkoutUrl) {
+        window.location.href = data.checkoutUrl;
+      } else {
+        toast(data.error || "Failed to create checkout", "error");
+        setPurchasing(false);
+      }
+    } catch {
+      toast("Something went wrong. Please try again.", "error");
       setPurchasing(false);
     }
   }

@@ -97,6 +97,18 @@ export default function NfcCheckInPage({ params }: { params: Promise<{ tagUid: s
     );
   }
 
+  if (tagData && tagData.status === "deactivated") {
+    return (
+      <div className="mx-auto max-w-lg px-4 py-16 text-center space-y-4">
+        <ShieldCheck className="h-12 w-12 text-red-500 mx-auto" />
+        <h1 className="text-2xl font-bold">Tag Deactivated</h1>
+        <p className="text-[var(--muted-foreground)]">
+          This tag has been deactivated due to possible tampering.
+        </p>
+      </div>
+    );
+  }
+
   if (!tagData) return null;
 
   const { vaultItem } = tagData;
@@ -175,7 +187,7 @@ export default function NfcCheckInPage({ params }: { params: Promise<{ tagUid: s
           <p className="text-sm text-[var(--muted-foreground)]">
             {authStatus === "authenticated"
               ? "You are not the current owner of this item. Only the owner can check in."
-              : "Sign in to check in this item if you&apos;re the owner."}
+              : "Sign in to check in this item if you are the owner."}
           </p>
         </div>
       )}

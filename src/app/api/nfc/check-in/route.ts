@@ -42,7 +42,7 @@ export async function POST(req: Request) {
 
     const conditionReport = await prisma.conditionReport.create({
       data: {
-        vaultItemId: nfcTag.vaultItemId!,
+        vaultItemId: nfcTag.vaultItem.id,
         reporterId: session.user.id,
         condition,
         notes: notes || null,
