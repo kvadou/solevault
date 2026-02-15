@@ -409,6 +409,7 @@ model NfcTag {
   purchaseId  String?   // Stripe payment reference
   assignedAt  DateTime?
   createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   vaultItem VaultItem? @relation(fields: [vaultItemId], references: [id])
 
