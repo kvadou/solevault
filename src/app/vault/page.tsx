@@ -5,7 +5,7 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import { Loader2, Plus, Tag, PackageOpen, DollarSign, Shield } from "lucide-react";
+import { Loader2, Plus, Tag, PackageOpen, DollarSign, Shield, TrendingUp, ChevronDown, ChevronUp } from "lucide-react";
 import { toast } from "@/components/ui/Toast";
 import { Badge } from "@/components/ui/Badge";
 import { Modal } from "@/components/ui/Modal";
@@ -30,6 +30,23 @@ interface VaultItem {
   listings: Array<{ id: string; priceCents: number; status: string }>;
 }
 
+interface RevenueShareSummary {
+  pendingCents: number;
+  pendingCount: number;
+  creditedCents: number;
+  creditedCount: number;
+  totalEarnedCents: number;
+}
+
+interface VaultedItemRevenue {
+  id: string;
+  sneaker: { brand: string; model: string; colorway: string | null; imageUrl: string | null };
+  size: string;
+  condition: string;
+  status: string;
+  revenue: { totalRevenueCents: number; totalShareCents: number; tradeCount: number };
+}
+
 export default function VaultPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
@@ -42,6 +59,9 @@ export default function VaultPage() {
   const [buybackQuote, setBuybackQuote] = useState<{ fmvCents: number; payoutCents: number; platformRevenueCents: number } | null>(null);
   const [buybackLoading, setBuybackLoading] = useState(false);
   const [buybackExecuting, setBuybackExecuting] = useState(false);
+  const [revShareSummary, setRevShareSummary] = useState<RevenueShareSummary | null>(null);
+  const [revShareItems, setRevShareItems] = useState<VaultedItemRevenue[]>([]);
+  const [showRevShare, setShowRevShare] = useState(false);
 
   useEffect(() => {
     if (status === "unauthenticated") router.push("/auth/signin");
@@ -52,6 +72,13 @@ export default function VaultPage() {
       fetch("/api/vault")
         .then((r) => r.json())
         .then((data) => { setItems(data); setLoading(false); });
+      fetch("/api/revenue-share")
+        .then((r) => r.json())
+        .then((data) => {
+          setRevShareSummary(data.summary);
+          setRevShareItems(data.vaultedItems || []);
+        })
+        .catch(() => {});
     }
   }, [session]);
 
@@ -136,6 +163,63 @@ export default function VaultPage() {
           Vault a Pair
         </Link>
       </div>
+
+      {/* Revenue Share Section */}
+      {revShareSummary && revShareSummary.totalEarnedCents > 0 && (
+        <div className="mb-8 rounded-lg border border-[var(--border)] bg-[var(--background)] overflow-hidden">
+          <button
+            onClick={() => setShowRevShare(!showRevShare)}
+            className="w-full flex items-center justify-between p-4 hover:bg-[var(--muted)]/50 transition-colors"
+          >
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-green-100">
+                <TrendingUp className="h-5 w-5 text-green-600" />
+              </div>
+              <div className="text-left">
+                <h3 className="font-semibold">Vaulter Revenue Share</h3>
+                <p className="text-sm text-[var(--muted-foreground)]">
+                  1% of all platform revenue from items you submitted
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-4">
+              <div className="text-right">
+                <p className="text-lg font-bold text-green-600">{formatPrice(revShareSummary.totalEarnedCents)}</p>
+                <p className="text-xs text-[var(--muted-foreground)]">
+                  {formatPrice(revShareSummary.pendingCents)} pending
+                </p>
+              </div>
+              {showRevShare ? <ChevronUp className="h-5 w-5 text-[var(--muted-foreground)]" /> : <ChevronDown className="h-5 w-5 text-[var(--muted-foreground)]" />}
+            </div>
+          </button>
+          {showRevShare && revShareItems.length > 0 && (
+            <div className="border-t border-[var(--border)] p-4">
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {revShareItems.map((item) => (
+                  <div key={item.id} className="rounded-lg border border-[var(--border)] p-3">
+                    <div className="flex items-center gap-2 mb-2">
+                      <p className="text-sm font-medium truncate">{item.sneaker.brand} {item.sneaker.model}</p>
+                      <span className={`text-xs rounded-full px-2 py-0.5 whitespace-nowrap ${
+                        item.status === "packed" ? "bg-purple-100 text-purple-700" :
+                        item.status === "listed" ? "bg-blue-100 text-blue-700" :
+                        item.status === "vaulted" ? "bg-green-100 text-green-700" :
+                        "bg-gray-100 text-gray-700"
+                      }`}>
+                        {item.status}
+                      </span>
+                    </div>
+                    <p className="text-xs text-[var(--muted-foreground)]">Size {item.size}</p>
+                    <div className="mt-2 flex items-center justify-between text-xs">
+                      <span className="text-[var(--muted-foreground)]">{item.revenue.tradeCount} trade{item.revenue.tradeCount !== 1 ? "s" : ""}</span>
+                      <span className="font-medium text-green-600">+{formatPrice(item.revenue.totalShareCents)}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {items.length === 0 ? (
         <div className="text-center py-20 space-y-4">

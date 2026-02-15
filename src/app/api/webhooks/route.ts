@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { stripe } from "@/lib/stripe";
 import Stripe from "stripe";
 import { createOwnershipRecord } from "@/lib/ownership";
+import { createRevenueShare } from "@/lib/revenue-share";
 
 export async function POST(req: Request) {
   const body = await req.text();
@@ -91,6 +92,14 @@ export async function POST(req: Request) {
       toUserId: order.buyerId,
       eventType: "marketplace_sale",
       orderId: order.id,
+    });
+
+    // Create revenue share for original vaulter (1% of platform revenue)
+    await createRevenueShare({
+      vaultItemId: order.vaultItemId,
+      sourceType: "marketplace_sale",
+      sourceId: order.id,
+      totalRevenueCents: order.platformRevenueCents,
     });
 
     // Record price history

@@ -33,6 +33,18 @@ function randomPrice(retailCents: number): number {
 async function main() {
   console.log("Seeding database...");
 
+  // Create platform system account (for buyback inventory)
+  await prisma.user.upsert({
+    where: { email: "platform@solevault.io" },
+    update: {},
+    create: {
+      email: "platform@solevault.io",
+      name: "SoleVault Platform",
+      role: "admin",
+    },
+  });
+  console.log("Platform system account: platform@solevault.io");
+
   // Create admin user
   const adminPassword = await bcrypt.hash("admin123", 12);
   const admin = await prisma.user.upsert({
@@ -89,6 +101,7 @@ async function main() {
           status: "listed",
           authenticationStatus: "passed",
           askingPriceCents: priceCents,
+          originalVaulterId: owner.id,
           vaultedAt: new Date(),
           imageUrls: sneaker.imageUrl ? [sneaker.imageUrl] : [],
         },
@@ -129,10 +142,124 @@ async function main() {
   }
   console.log(`Created ${historyCount} price history entries`);
 
+  // Seed mystery packs
+  // Create some extra vaulted items owned by admin (platform inventory) for pack pools
+  const packItems = [];
+  for (const sneaker of createdSneakers) {
+    const size = SIZES[Math.floor(Math.random() * SIZES.length)];
+    const condition = CONDITIONS[Math.floor(Math.random() * 2)]; // deadstock or vnds only
+    const item = await prisma.vaultItem.create({
+      data: {
+        ownerId: admin.id,
+        sneakerId: sneaker.id,
+        size,
+        condition,
+        status: "vaulted",
+        authenticationStatus: "passed",
+        originalVaulterId: admin.id,
+        vaultedAt: new Date(),
+        imageUrls: sneaker.imageUrl ? [sneaker.imageUrl] : [],
+      },
+    });
+    packItems.push({ item, retailCents: sneaker.retailPriceCents || 15000 });
+  }
+
+  // Create pack tiers
+  const bronzeTier = await prisma.packTier.create({
+    data: { name: "Bronze Pack", slug: "bronze-pack", priceCents: 2500, description: "Starter pack — great for first-timers", totalSupply: 50, status: "active" },
+  });
+  const silverTier = await prisma.packTier.create({
+    data: { name: "Silver Pack", slug: "silver-pack", priceCents: 5000, description: "Mid-tier pulls with solid value", totalSupply: 30, status: "active" },
+  });
+  const goldTier = await prisma.packTier.create({
+    data: { name: "Gold Pack", slug: "gold-pack", priceCents: 10000, description: "Premium pulls — high chance of profit", totalSupply: 20, status: "active" },
+  });
+
+  // Assign items to pools based on retail value
+  for (const { item, retailCents } of packItems) {
+    let tierId: string;
+    let weight: number;
+
+    if (retailCents >= 20000) {
+      // High-value → gold tier, lower weight (rarer)
+      tierId = goldTier.id;
+      weight = 1;
+    } else if (retailCents >= 14000) {
+      // Mid-value → silver tier
+      tierId = silverTier.id;
+      weight = 2;
+    } else {
+      // Standard → bronze tier
+      tierId = bronzeTier.id;
+      weight = 3;
+    }
+
+    await prisma.packPoolItem.create({
+      data: { packTierId: tierId, vaultItemId: item.id, oddsWeight: weight },
+    });
+    await prisma.vaultItem.update({
+      where: { id: item.id },
+      data: { status: "packed" },
+    });
+  }
+
+  console.log(`Created 3 pack tiers with ${packItems.length} pool items`);
+
+  // Seed curated drops
+  const now = new Date();
+  const liveDrop = await prisma.drop.create({
+    data: {
+      name: "Valentine's Day Heat",
+      slug: "valentines-day-heat",
+      description: "Limited edition drops for Valentine's Day. Premium sneakers, exclusive pulls.",
+      theme: "valentines",
+      startsAt: new Date(now.getTime() - 3600000), // started 1 hour ago
+      endsAt: new Date(now.getTime() + 86400000 * 3), // ends in 3 days
+      status: "live",
+      maxPurchasesPerUser: 3,
+    },
+  });
+  // Link bronze and silver tiers to this drop
+  await prisma.packTier.update({ where: { id: bronzeTier.id }, data: { dropId: liveDrop.id } });
+  await prisma.packTier.update({ where: { id: silverTier.id }, data: { dropId: liveDrop.id } });
+
+  const upcomingDrop = await prisma.drop.create({
+    data: {
+      name: "Grail Season",
+      slug: "grail-season",
+      description: "The most coveted sneakers in the vault. High-value pulls only.",
+      theme: "grail",
+      startsAt: new Date(now.getTime() + 86400000 * 2), // starts in 2 days
+      endsAt: new Date(now.getTime() + 86400000 * 5), // ends in 5 days
+      status: "upcoming",
+      maxPurchasesPerUser: 2,
+    },
+  });
+  // Link gold tier to upcoming drop
+  await prisma.packTier.update({ where: { id: goldTier.id }, data: { dropId: upcomingDrop.id } });
+
+  console.log("Created 2 drops (1 live, 1 upcoming) with linked tiers");
+
+  // Give test user some wallet balance to try packs
+  await prisma.user.update({
+    where: { id: testUser.id },
+    data: { balanceCents: 50000 }, // $500
+  });
+  await prisma.walletTransaction.create({
+    data: {
+      userId: testUser.id,
+      type: "deposit",
+      amountCents: 50000,
+      balanceAfterCents: 50000,
+      description: "Welcome bonus (seed)",
+    },
+  });
+  console.log("Gave test user $500 wallet balance");
+
   console.log("\nSeed complete!");
   console.log("-------------------------------");
   console.log("Admin login:  admin@solevault.io / admin123");
-  console.log("User login:   user@solevault.io / user123");
+  console.log("User login:   user@solevault.io / user123 ($500 wallet)");
   console.log("-------------------------------");
 }
 

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { createOwnershipRecord } from "@/lib/ownership";
+import { createRevenueShare } from "@/lib/revenue-share";
 
 export async function GET(
   _req: Request,
@@ -87,6 +88,14 @@ export async function POST(
     toUserId: session.user.id!,
     eventType: "pack_reveal",
     packRipId: rip.id,
+  });
+
+  // Create revenue share for original vaulter (1% of platform revenue)
+  await createRevenueShare({
+    vaultItemId: rip.packPoolItem!.vaultItemId,
+    sourceType: "pack_rip",
+    sourceId: rip.id,
+    totalRevenueCents: rip.platformRevenueCents,
   });
 
   return NextResponse.json({ success: true });

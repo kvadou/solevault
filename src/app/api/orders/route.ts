@@ -4,6 +4,7 @@ import { auth } from "@/lib/auth";
 import { stripe } from "@/lib/stripe";
 import { calculateFees } from "@/lib/utils";
 import { createOwnershipRecord } from "@/lib/ownership";
+import { createRevenueShare } from "@/lib/revenue-share";
 
 export async function GET() {
   const session = await auth();
@@ -103,6 +104,14 @@ export async function POST(req: Request) {
       toUserId: session.user.id!,
       eventType: "marketplace_sale",
       orderId: order.id,
+    });
+
+    // Create revenue share for original vaulter (1% of platform revenue)
+    await createRevenueShare({
+      vaultItemId: listing.vaultItemId,
+      sourceType: "marketplace_sale",
+      sourceId: order.id,
+      totalRevenueCents: fees.platformRevenueCents,
     });
 
     // Log wallet transactions for buyer and seller

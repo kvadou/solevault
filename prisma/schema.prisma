@@ -32,6 +32,7 @@ model User {
   walletTransactions  WalletTransaction[]
   packRips            PackRip[]
   buybackTransactions BuybackTransaction[] @relation("UserBuybacks")
+  revenueShares       RevenueShare[]       @relation("VaulterShares")
   authenticatorReports AuthenticationReport[] @relation("AuthenticatorReports")
   ownershipFrom        OwnershipRecord[]      @relation("OwnershipFrom")
   ownershipTo          OwnershipRecord[]      @relation("OwnershipTo")
@@ -101,6 +102,7 @@ model VaultItem {
   // "pending" | "passed" | "failed"
   askingPriceCents     Int?
   fmvOverrideCents     Int?
+  originalVaulterId    String?
   vaultLocation        String?
   imageUrls            String[]
   notes                String?
@@ -117,6 +119,7 @@ model VaultItem {
   orders             Order[]
   packPoolItems      PackPoolItem[]
   buybackTransactions BuybackTransaction[]
+  revenueShares       RevenueShare[]
   authReport          AuthenticationReport?
   ownershipHistory    OwnershipRecord[]
 }
@@ -356,4 +359,23 @@ model OwnershipRecord {
   toUser    User      @relation("OwnershipTo", fields: [toUserId], references: [id])
 
   @@index([vaultItemId, createdAt])
+}
+
+model RevenueShare {
+  id                 String    @id @default(cuid())
+  vaulterId          String
+  vaultItemId        String
+  sourceType         String    // "pack_rip" | "buyback" | "marketplace_sale"
+  sourceId           String
+  totalRevenueCents  Int
+  shareAmountCents   Int       // 1% of totalRevenueCents
+  status             String    @default("pending") // "pending" | "credited"
+  creditedAt         DateTime?
+  createdAt          DateTime  @default(now())
+
+  vaulter   User      @relation("VaulterShares", fields: [vaulterId], references: [id])
+  vaultItem VaultItem @relation(fields: [vaultItemId], references: [id])
+
+  @@index([vaulterId, status])
+  @@index([vaultItemId])
 }
