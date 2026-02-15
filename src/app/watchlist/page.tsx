@@ -44,7 +44,10 @@ export default function WatchlistPage() {
   useEffect(() => {
     if (session) {
       fetch("/api/watchlist")
-        .then((r) => r.json())
+        .then((r) => {
+          if (!r.ok) throw new Error("Failed to load");
+          return r.json();
+        })
         .then((data) => {
           setItems(data);
           setLoading(false);
@@ -98,9 +101,15 @@ export default function WatchlistPage() {
       if (res.ok) {
         const updated = await res.json();
         setItems((prev) =>
-          prev.map((item) =>
-            item.id === itemId ? { ...item, ...updated } : item
-          )
+          prev.map((item) => {
+            if (item.id !== itemId) return item;
+            const newTarget = updated.targetPriceCents ?? null;
+            const targetReached =
+              newTarget != null &&
+              item.lowestAskCents != null &&
+              item.lowestAskCents <= newTarget;
+            return { ...item, targetPriceCents: newTarget, targetReached };
+          })
         );
         toast("Target price updated", "success");
         setEditingId(null);
@@ -262,6 +271,7 @@ export default function WatchlistPage() {
                           disabled={savingId === item.id}
                           className="rounded p-0.5 hover:bg-[var(--muted)] transition-colors text-green-600 disabled:opacity-50"
                           title="Save"
+                          aria-label="Save target price"
                         >
                           {savingId === item.id ? (
                             <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -273,6 +283,7 @@ export default function WatchlistPage() {
                           onClick={cancelEditing}
                           className="rounded p-0.5 hover:bg-[var(--muted)] transition-colors text-[var(--muted-foreground)]"
                           title="Cancel"
+                          aria-label="Cancel editing"
                         >
                           <X className="h-3.5 w-3.5" />
                         </button>
@@ -296,6 +307,7 @@ export default function WatchlistPage() {
                           onClick={() => startEditing(item)}
                           className="rounded p-0.5 hover:bg-[var(--muted)] transition-colors text-[var(--muted-foreground)]"
                           title="Edit target price"
+                          aria-label="Edit target price"
                         >
                           <Pencil className="h-3 w-3" />
                         </button>
@@ -317,6 +329,7 @@ export default function WatchlistPage() {
                     disabled={removingId === item.id}
                     className="inline-flex items-center justify-center rounded-md border border-[var(--border)] px-3 py-1.5 text-sm text-[var(--muted-foreground)] hover:text-red-600 hover:border-red-300 transition-colors disabled:opacity-50"
                     title="Remove from watchlist"
+                    aria-label="Remove from watchlist"
                   >
                     {removingId === item.id ? (
                       <Loader2 className="h-3.5 w-3.5 animate-spin" />
