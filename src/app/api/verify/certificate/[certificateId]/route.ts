@@ -81,6 +81,7 @@ export async function GET(
       styleCode: sneaker.styleCode,
       imageUrl: sneaker.imageUrl,
     },
+    ownerId: vaultItem.ownerId,
     item: {
       id: vaultItem.id,
       size: vaultItem.size,

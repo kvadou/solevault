@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, use, useCallback } from "react";
+import { useSession } from "next-auth/react";
 import Image from "next/image";
 import {
   ShieldCheck,
@@ -13,13 +14,16 @@ import {
   Loader2,
   FileCheck,
   Camera,
+  MessageSquareWarning,
 } from "lucide-react";
+import { toast } from "@/components/ui/Toast";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
 /* ------------------------------------------------------------------ */
 
 interface TrustProfileData {
+  ownerId: string;
   certificate: {
     id: string;
     provider: string;
@@ -134,6 +138,14 @@ function StatusBadge({ status }: { status: string }) {
       </span>
     );
   }
+  if (status === "disputed") {
+    return (
+      <span className="inline-flex items-center gap-1.5 rounded-full bg-orange-500/15 px-3 py-1 text-sm font-semibold text-orange-600">
+        <MessageSquareWarning className="h-4 w-4" />
+        Disputed
+      </span>
+    );
+  }
   if (status === "needs_review") {
     return (
       <span className="inline-flex items-center gap-1.5 rounded-full bg-yellow-500/15 px-3 py-1 text-sm font-semibold text-yellow-600">
@@ -223,10 +235,14 @@ export default function TrustProfilePage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
+  const { data: session } = useSession();
   const [data, setData] = useState<TrustProfileData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [showDispute, setShowDispute] = useState(false);
+  const [disputeReason, setDisputeReason] = useState("");
+  const [disputeLoading, setDisputeLoading] = useState(false);
 
   useEffect(() => {
     fetch(`/api/verify/certificate/${id}`)
@@ -251,6 +267,41 @@ export default function TrustProfilePage({
       setTimeout(() => setCopied(false), 2000);
     });
   }, []);
+
+  const handleDispute = useCallback(async () => {
+    if (!data || !disputeReason.trim()) return;
+    setDisputeLoading(true);
+    try {
+      const res = await fetch("/api/verify/dispute", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          certificateId: data.certificate.id,
+          reason: disputeReason.trim(),
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Failed to submit dispute");
+      }
+      toast("Dispute submitted successfully", "success");
+      setShowDispute(false);
+      setDisputeReason("");
+      // Refresh data
+      const refreshRes = await fetch(`/api/verify/certificate/${id}`);
+      if (refreshRes.ok) {
+        const refreshData = await refreshRes.json();
+        setData(refreshData);
+      }
+    } catch (err) {
+      toast(
+        err instanceof Error ? err.message : "Failed to submit dispute",
+        "error"
+      );
+    } finally {
+      setDisputeLoading(false);
+    }
+  }, [data, disputeReason, id]);
 
   /* Loading state */
   if (loading) {
@@ -376,6 +427,83 @@ export default function TrustProfilePage({
                 Powered by {certificate.provider}
               </p>
             )}
+          </section>
+        )}
+
+        {/* ----------------------------------------------------------
+            DISPUTE SECTION (failed certs owned by current user)
+        ---------------------------------------------------------- */}
+        {certificate.status === "failed" &&
+          session?.user &&
+          (session.user as { id?: string })?.id === data.ownerId && (
+            <section>
+              <div className="rounded-lg border border-red-200 bg-red-50 p-5 space-y-3">
+                <div className="flex items-center gap-2">
+                  <MessageSquareWarning className="h-5 w-5 text-red-600" />
+                  <h3 className="text-sm font-semibold text-red-800">
+                    Verification Failed
+                  </h3>
+                </div>
+                <p className="text-sm text-red-700">
+                  If you believe this result is incorrect, you can dispute it for manual review by our team.
+                </p>
+                {!showDispute ? (
+                  <button
+                    onClick={() => setShowDispute(true)}
+                    className="inline-flex items-center gap-1.5 rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 transition-colors"
+                  >
+                    <MessageSquareWarning className="h-3.5 w-3.5" />
+                    Dispute This Result
+                  </button>
+                ) : (
+                  <div className="space-y-3">
+                    <textarea
+                      value={disputeReason}
+                      onChange={(e) => setDisputeReason(e.target.value)}
+                      placeholder="Explain why you believe this verification result is incorrect..."
+                      className="w-full rounded-md border border-red-200 bg-white px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-red-300"
+                      rows={3}
+                    />
+                    <div className="flex gap-2">
+                      <button
+                        onClick={handleDispute}
+                        disabled={disputeLoading || !disputeReason.trim()}
+                        className="inline-flex items-center gap-1.5 rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50 transition-colors"
+                      >
+                        {disputeLoading && (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        )}
+                        Submit Dispute
+                      </button>
+                      <button
+                        onClick={() => {
+                          setShowDispute(false);
+                          setDisputeReason("");
+                        }}
+                        className="rounded-md border border-red-200 px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-100 transition-colors"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </section>
+          )}
+
+        {certificate.status === "disputed" && (
+          <section>
+            <div className="rounded-lg border border-orange-200 bg-orange-50 p-5">
+              <div className="flex items-center gap-2 mb-2">
+                <MessageSquareWarning className="h-5 w-5 text-orange-600" />
+                <h3 className="text-sm font-semibold text-orange-800">
+                  Dispute Under Review
+                </h3>
+              </div>
+              <p className="text-sm text-orange-700">
+                Your dispute has been submitted and is being reviewed by our authentication team.
+              </p>
+            </div>
           </section>
         )}
 
