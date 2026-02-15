@@ -3,6 +3,7 @@
 import { useState, useEffect, use } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import Image from "next/image";
 import { Loader2, Shield, Vault, TrendingUp } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
@@ -75,7 +76,7 @@ export default function SneakerDetailPage({ params }: { params: Promise<{ id: st
   }
 
   const activeListing = sneaker.vaultItems
-    .flatMap((v) => v.listings.map((l) => ({ ...l, size: v.size, condition: v.condition, imageUrls: v.imageUrls })))
+    .flatMap((v) => v.listings.map((l) => ({ ...l, vaultItemId: v.id, size: v.size, condition: v.condition, imageUrls: v.imageUrls })))
     .sort((a, b) => a.priceCents - b.priceCents);
 
   const lowestPrice = activeListing[0]?.priceCents;
@@ -135,6 +136,9 @@ export default function SneakerDetailPage({ params }: { params: Promise<{ id: st
                         Size {l.size}
                       </span>
                       <span className="text-xs text-[var(--muted-foreground)]">{conditionLabel(l.condition)}</span>
+                      <Link href={`/certificate/${l.vaultItemId}`} className="text-xs text-[var(--accent)] hover:underline inline-flex items-center gap-1">
+                        <Shield className="h-3 w-3" /> Verified
+                      </Link>
                     </div>
                     <div className="flex items-center gap-3">
                       <span className="font-bold">{formatPrice(l.priceCents)}</span>

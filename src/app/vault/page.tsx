@@ -5,7 +5,8 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import { Loader2, Plus, Tag, PackageOpen } from "lucide-react";
+import { Loader2, Plus, Tag, PackageOpen, DollarSign, Shield } from "lucide-react";
+import { toast } from "@/components/ui/Toast";
 import { Badge } from "@/components/ui/Badge";
 import { Modal } from "@/components/ui/Modal";
 import { formatPrice, conditionLabel } from "@/lib/utils";
@@ -37,6 +38,10 @@ export default function VaultPage() {
   const [listModal, setListModal] = useState<VaultItem | null>(null);
   const [listPrice, setListPrice] = useState("");
   const [listing, setListing] = useState(false);
+  const [buybackModal, setBuybackModal] = useState<VaultItem | null>(null);
+  const [buybackQuote, setBuybackQuote] = useState<{ fmvCents: number; payoutCents: number; platformRevenueCents: number } | null>(null);
+  const [buybackLoading, setBuybackLoading] = useState(false);
+  const [buybackExecuting, setBuybackExecuting] = useState(false);
 
   useEffect(() => {
     if (status === "unauthenticated") router.push("/auth/signin");
@@ -67,6 +72,45 @@ export default function VaultPage() {
       setItems(data);
     }
     setListing(false);
+  }
+
+  async function openBuyback(item: VaultItem) {
+    setBuybackModal(item);
+    setBuybackLoading(true);
+    setBuybackQuote(null);
+    const res = await fetch(`/api/buyback?vaultItemId=${item.id}`);
+    if (res.ok) {
+      const data = await res.json();
+      setBuybackQuote(data);
+    } else {
+      const data = await res.json();
+      toast(data.error || "Could not get buyback quote", "error");
+      setBuybackModal(null);
+    }
+    setBuybackLoading(false);
+  }
+
+  async function executeBuyback() {
+    if (!buybackModal) return;
+    setBuybackExecuting(true);
+    const res = await fetch("/api/buyback", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ vaultItemId: buybackModal.id }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      toast(`Sold for ${formatPrice(data.payoutCents)}! Balance: ${formatPrice(data.newBalanceCents)}`, "success");
+      setBuybackModal(null);
+      setBuybackQuote(null);
+      // Refresh vault items
+      const refreshed = await fetch("/api/vault").then((r) => r.json());
+      setItems(refreshed);
+    } else {
+      const data = await res.json();
+      toast(data.error || "Buyback failed", "error");
+    }
+    setBuybackExecuting(false);
   }
 
   if (loading) {
@@ -130,17 +174,33 @@ export default function VaultPage() {
                   <span>&middot;</span>
                   <span>{conditionLabel(item.condition)}</span>
                 </div>
+                {item.authenticationStatus === "passed" && (
+                  <Link
+                    href={`/certificate/${item.id}`}
+                    className="inline-flex items-center gap-1 text-xs text-[var(--accent)] hover:underline"
+                  >
+                    <Shield className="h-3 w-3" /> View Certificate
+                  </Link>
+                )}
                 {item.askingPriceCents && (
                   <p className="text-lg font-bold">{formatPrice(item.askingPriceCents)}</p>
                 )}
                 <div className="pt-2 flex gap-2">
                   {item.status === "vaulted" && (
-                    <button
-                      onClick={() => { setListModal(item); setListPrice(""); }}
-                      className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-md bg-[var(--accent)] px-3 py-1.5 text-sm font-medium text-white hover:opacity-90 transition-opacity"
-                    >
-                      <Tag className="h-3.5 w-3.5" /> List for Sale
-                    </button>
+                    <>
+                      <button
+                        onClick={() => { setListModal(item); setListPrice(""); }}
+                        className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-md bg-[var(--accent)] px-3 py-1.5 text-sm font-medium text-white hover:opacity-90 transition-opacity"
+                      >
+                        <Tag className="h-3.5 w-3.5" /> List
+                      </button>
+                      <button
+                        onClick={() => openBuyback(item)}
+                        className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-md border border-[var(--accent)] px-3 py-1.5 text-sm font-medium text-[var(--accent)] hover:bg-[var(--accent)]/10 transition-colors"
+                      >
+                        <DollarSign className="h-3.5 w-3.5" /> Buyback
+                      </button>
+                    </>
                   )}
                   {item.status === "listed" && (
                     <span className="flex-1 text-center text-sm text-[var(--muted-foreground)] py-1.5">Currently Listed</span>
@@ -197,6 +257,71 @@ export default function VaultPage() {
                 List Now
               </button>
             </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Buyback modal */}
+      <Modal
+        open={!!buybackModal}
+        onClose={() => { if (!buybackExecuting) { setBuybackModal(null); setBuybackQuote(null); } }}
+      >
+        {buybackModal && (
+          <div>
+            <div className="flex items-center gap-3 mb-6">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-green-100 text-green-600">
+                <DollarSign className="h-5 w-5" />
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold">Instant Buyback</h2>
+                <p className="text-sm text-[var(--muted-foreground)]">Sell instantly at 85% of fair market value</p>
+              </div>
+            </div>
+
+            <p className="text-sm font-medium mb-4">
+              {buybackModal.sneaker.brand} {buybackModal.sneaker.model} — Size {buybackModal.size}, {conditionLabel(buybackModal.condition)}
+            </p>
+
+            {buybackLoading ? (
+              <div className="flex justify-center py-8">
+                <Loader2 className="h-5 w-5 animate-spin" />
+              </div>
+            ) : buybackQuote ? (
+              <>
+                <div className="rounded-lg bg-[var(--muted)] p-4 mb-6 space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-[var(--muted-foreground)]">Fair Market Value</span>
+                    <span className="font-medium">{formatPrice(buybackQuote.fmvCents)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-[var(--muted-foreground)]">Platform fee (15%)</span>
+                    <span className="font-medium text-red-500">-{formatPrice(buybackQuote.platformRevenueCents)}</span>
+                  </div>
+                  <div className="border-t border-[var(--border)] pt-2 flex justify-between">
+                    <span className="font-medium">You receive</span>
+                    <span className="text-lg font-bold text-green-600">{formatPrice(buybackQuote.payoutCents)}</span>
+                  </div>
+                </div>
+
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => { setBuybackModal(null); setBuybackQuote(null); }}
+                    disabled={buybackExecuting}
+                    className="flex-1 rounded-lg border border-[var(--border)] py-3 text-sm font-medium hover:bg-[var(--muted)] transition-colors disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={executeBuyback}
+                    disabled={buybackExecuting}
+                    className="flex-1 rounded-lg bg-[var(--accent)] py-3 text-sm font-bold text-[var(--accent-foreground)] hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2"
+                  >
+                    {buybackExecuting && <Loader2 className="h-4 w-4 animate-spin" />}
+                    Sell for {formatPrice(buybackQuote.payoutCents)}
+                  </button>
+                </div>
+              </>
+            ) : null}
           </div>
         )}
       </Modal>
