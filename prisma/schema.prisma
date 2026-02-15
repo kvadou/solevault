@@ -36,6 +36,7 @@ model User {
   authenticatorReports AuthenticationReport[] @relation("AuthenticatorReports")
   ownershipFrom        OwnershipRecord[]      @relation("OwnershipFrom")
   ownershipTo          OwnershipRecord[]      @relation("OwnershipTo")
+  bids                 Bid[]                  @relation("BidderBids")
 }
 
 model Account {
@@ -88,6 +89,7 @@ model Sneaker {
   vaultItems    VaultItem[]
   priceHistory  PriceHistory[]
   watchlist     Watchlist[]
+  bids          Bid[]
 }
 
 model VaultItem {
@@ -122,6 +124,7 @@ model VaultItem {
   revenueShares       RevenueShare[]
   authReport          AuthenticationReport?
   ownershipHistory    OwnershipRecord[]
+  bids                Bid[]
 }
 
 model Listing {
@@ -378,4 +381,24 @@ model RevenueShare {
 
   @@index([vaulterId, status])
   @@index([vaultItemId])
+}
+
+model Bid {
+  id          String    @id @default(cuid())
+  sneakerId   String
+  bidderId    String
+  size        String
+  amountCents Int
+  status      String    @default("active") // "active" | "accepted" | "countered" | "declined" | "expired" | "cancelled"
+  expiresAt   DateTime
+  vaultItemId String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  sneaker   Sneaker    @relation(fields: [sneakerId], references: [id])
+  bidder    User       @relation("BidderBids", fields: [bidderId], references: [id])
+  vaultItem VaultItem? @relation(fields: [vaultItemId], references: [id])
+
+  @@index([sneakerId, status])
+  @@index([bidderId, createdAt])
 }
