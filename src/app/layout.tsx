@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { SessionProvider } from "@/components/layout/SessionProvider";
 import { Navbar } from "@/components/layout/Navbar";
+import { ToastProvider } from "@/components/ui/Toast";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -13,8 +14,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en">
       <body className="min-h-screen bg-[var(--background)] text-[var(--foreground)]">
         <SessionProvider>
-          <Navbar />
-          <main className="min-h-[calc(100vh-64px)]">{children}</main>
+          <ToastProvider>
+            <Navbar />
+            <main className="min-h-[calc(100vh-64px)]">{children}</main>
+          </ToastProvider>
         </SessionProvider>
       </body>
     </html>
