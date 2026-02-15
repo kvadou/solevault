@@ -2,13 +2,24 @@
 
 import Link from "next/link";
 import { useSession, signOut } from "next-auth/react";
-import { useState } from "react";
-import { Menu, X, Vault, ShoppingBag, LayoutDashboard, LogOut, User } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Menu, X, Vault, ShoppingBag, LayoutDashboard, LogOut, User, Wallet, Gift, Flame, Eye } from "lucide-react";
+import { formatPrice } from "@/lib/utils";
 
 export function Navbar() {
   const { data: session } = useSession();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [balanceCents, setBalanceCents] = useState<number | null>(null);
   const isAdmin = (session?.user as { role?: string })?.role === "admin";
+
+  useEffect(() => {
+    if (session?.user) {
+      fetch("/api/wallet")
+        .then((res) => res.json())
+        .then((data) => setBalanceCents(data.balanceCents ?? 0))
+        .catch(() => {});
+    }
+  }, [session]);
 
   return (
     <nav className="sticky top-0 z-50 border-b border-[var(--border)] bg-[var(--background)]/80 backdrop-blur-md">
@@ -24,13 +35,26 @@ export function Navbar() {
             <Link href="/marketplace" className="text-sm font-medium hover:text-[var(--accent)] transition-colors">
               Marketplace
             </Link>
+            <Link href="/packs" className="text-sm font-medium hover:text-[var(--accent)] transition-colors">
+              Packs
+            </Link>
+            <Link href="/drops" className="text-sm font-medium hover:text-[var(--accent)] transition-colors">
+              Drops
+            </Link>
             {session && (
               <>
                 <Link href="/vault" className="text-sm font-medium hover:text-[var(--accent)] transition-colors">
                   My Vault
                 </Link>
+                <Link href="/watchlist" className="text-sm font-medium hover:text-[var(--accent)] transition-colors">
+                  Watchlist
+                </Link>
                 <Link href="/orders" className="text-sm font-medium hover:text-[var(--accent)] transition-colors">
                   Orders
+                </Link>
+                <Link href="/wallet" className="inline-flex items-center gap-1.5 text-sm font-medium hover:text-[var(--accent)] transition-colors">
+                  <Wallet className="h-3.5 w-3.5" />
+                  {balanceCents !== null ? formatPrice(balanceCents) : "—"}
                 </Link>
               </>
             )}
@@ -76,13 +100,25 @@ export function Navbar() {
           <Link href="/marketplace" className="flex items-center gap-2 text-sm py-2" onClick={() => setMobileOpen(false)}>
             <ShoppingBag className="h-4 w-4" /> Marketplace
           </Link>
+          <Link href="/packs" className="flex items-center gap-2 text-sm py-2" onClick={() => setMobileOpen(false)}>
+            <Gift className="h-4 w-4" /> Packs
+          </Link>
+          <Link href="/drops" className="flex items-center gap-2 text-sm py-2" onClick={() => setMobileOpen(false)}>
+            <Flame className="h-4 w-4" /> Drops
+          </Link>
           {session && (
             <>
               <Link href="/vault" className="flex items-center gap-2 text-sm py-2" onClick={() => setMobileOpen(false)}>
                 <Vault className="h-4 w-4" /> My Vault
               </Link>
+              <Link href="/watchlist" className="flex items-center gap-2 text-sm py-2" onClick={() => setMobileOpen(false)}>
+                <Eye className="h-4 w-4" /> Watchlist
+              </Link>
               <Link href="/orders" className="flex items-center gap-2 text-sm py-2" onClick={() => setMobileOpen(false)}>
                 <ShoppingBag className="h-4 w-4" /> Orders
+              </Link>
+              <Link href="/wallet" className="flex items-center gap-2 text-sm py-2" onClick={() => setMobileOpen(false)}>
+                <Wallet className="h-4 w-4" /> Wallet {balanceCents !== null && <span className="ml-auto text-[var(--accent)] font-medium">{formatPrice(balanceCents)}</span>}
               </Link>
             </>
           )}

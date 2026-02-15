@@ -5,9 +5,10 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import { Loader2, Shield, Vault, TrendingUp } from "lucide-react";
+import { Loader2, Shield, Vault, TrendingUp, Heart } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
 import { Modal } from "@/components/ui/Modal";
+import { toast } from "@/components/ui/Toast";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { formatPrice, conditionLabel, calculateFees } from "@/lib/utils";
 
@@ -35,7 +36,12 @@ interface SneakerDetail {
     lowestSalePriceCents: number | null;
     highestSalePriceCents: number | null;
     totalSold: number;
+    totalVaultItems: number;
+    activeListingsCount: number;
+    lowestAskCents: number | null;
   };
+  isWatching?: boolean;
+  watchlistId?: string | null;
 }
 
 export default function SneakerDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -46,12 +52,46 @@ export default function SneakerDetailPage({ params }: { params: Promise<{ id: st
   const [loading, setLoading] = useState(true);
   const [buying, setBuying] = useState(false);
   const [confirmModal, setConfirmModal] = useState<{ listingId: string; priceCents: number; size: string } | null>(null);
+  const [watching, setWatching] = useState(false);
+  const [watchlistEntryId, setWatchlistEntryId] = useState<string | null>(null);
+  const [watchLoading, setWatchLoading] = useState(false);
 
   useEffect(() => {
     fetch(`/api/sneakers/${id}`)
       .then((r) => r.json())
-      .then((data) => { setSneaker(data); setLoading(false); });
+      .then((data) => {
+        setSneaker(data);
+        setWatching(data.isWatching ?? false);
+        setWatchlistEntryId(data.watchlistId ?? null);
+        setLoading(false);
+      });
   }, [id]);
+
+  async function toggleWatch() {
+    if (!session) { router.push("/auth/signin"); return; }
+    setWatchLoading(true);
+    if (watching && watchlistEntryId) {
+      const res = await fetch(`/api/watchlist/${watchlistEntryId}`, { method: "DELETE" });
+      if (res.ok) {
+        setWatching(false);
+        setWatchlistEntryId(null);
+        toast("Removed from watchlist", "success");
+      }
+    } else {
+      const res = await fetch("/api/watchlist", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sneakerId: id }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setWatching(true);
+        setWatchlistEntryId(data.id);
+        toast("Added to watchlist", "success");
+      }
+    }
+    setWatchLoading(false);
+  }
 
   async function handleBuy() {
     if (!confirmModal || !session) return;
@@ -110,6 +150,18 @@ export default function SneakerDetailPage({ params }: { params: Promise<{ id: st
             <h1 className="text-3xl font-bold mt-1">{sneaker.model}</h1>
             {sneaker.colorway && <p className="text-[var(--muted-foreground)] mt-1">{sneaker.colorway}</p>}
             {sneaker.styleCode && <p className="text-sm text-[var(--muted-foreground)]">{sneaker.styleCode}</p>}
+            <button
+              onClick={toggleWatch}
+              disabled={watchLoading}
+              className={`mt-2 inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                watching
+                  ? "bg-red-50 text-red-600 border border-red-200 hover:bg-red-100"
+                  : "bg-[var(--muted)] text-[var(--muted-foreground)] hover:bg-[var(--border)]"
+              }`}
+            >
+              <Heart className={`h-4 w-4 ${watching ? "fill-current" : ""}`} />
+              {watchLoading ? "..." : watching ? "Watching" : "Watch"}
+            </button>
           </div>
 
           {lowestPrice && (
@@ -169,78 +221,92 @@ export default function SneakerDetailPage({ params }: { params: Promise<{ id: st
       </div>
 
       {/* Market Data & Price History */}
-      {sneaker.priceHistory.length > 0 && (
+      {sneaker.marketStats && (
         <div className="mt-8 space-y-6">
           {/* Market Stats Bar */}
-          {sneaker.marketStats && (
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              {sneaker.marketStats.lastSalePriceCents != null && (
-                <div className="rounded-lg border border-[var(--border)] p-4">
-                  <p className="text-xs text-[var(--muted-foreground)] uppercase tracking-wide">Last Sale</p>
-                  <p className="text-lg font-bold mt-1">{formatPrice(sneaker.marketStats.lastSalePriceCents)}</p>
-                </div>
-              )}
-              {sneaker.marketStats.avgSalePriceCents != null && (
-                <div className="rounded-lg border border-[var(--border)] p-4">
-                  <p className="text-xs text-[var(--muted-foreground)] uppercase tracking-wide">Average</p>
-                  <p className="text-lg font-bold mt-1">{formatPrice(sneaker.marketStats.avgSalePriceCents)}</p>
-                </div>
-              )}
-              {sneaker.marketStats.lowestSalePriceCents != null && sneaker.marketStats.highestSalePriceCents != null && (
-                <div className="rounded-lg border border-[var(--border)] p-4">
-                  <p className="text-xs text-[var(--muted-foreground)] uppercase tracking-wide">Range</p>
-                  <p className="text-lg font-bold mt-1">
-                    {formatPrice(sneaker.marketStats.lowestSalePriceCents)} — {formatPrice(sneaker.marketStats.highestSalePriceCents)}
-                  </p>
-                </div>
-              )}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+            {sneaker.marketStats.lowestAskCents != null && (
               <div className="rounded-lg border border-[var(--border)] p-4">
-                <p className="text-xs text-[var(--muted-foreground)] uppercase tracking-wide">Total Traded</p>
-                <p className="text-lg font-bold mt-1">{sneaker.marketStats.totalSold}</p>
+                <p className="text-xs text-[var(--muted-foreground)] uppercase tracking-wide">Lowest Ask</p>
+                <p className="text-lg font-bold mt-1 text-[var(--accent)]">{formatPrice(sneaker.marketStats.lowestAskCents)}</p>
+              </div>
+            )}
+            {sneaker.marketStats.lastSalePriceCents != null && (
+              <div className="rounded-lg border border-[var(--border)] p-4">
+                <p className="text-xs text-[var(--muted-foreground)] uppercase tracking-wide">Last Sale</p>
+                <p className="text-lg font-bold mt-1">{formatPrice(sneaker.marketStats.lastSalePriceCents)}</p>
+              </div>
+            )}
+            {sneaker.marketStats.avgSalePriceCents != null && (
+              <div className="rounded-lg border border-[var(--border)] p-4">
+                <p className="text-xs text-[var(--muted-foreground)] uppercase tracking-wide">Average</p>
+                <p className="text-lg font-bold mt-1">{formatPrice(sneaker.marketStats.avgSalePriceCents)}</p>
+              </div>
+            )}
+            {sneaker.marketStats.lowestSalePriceCents != null && sneaker.marketStats.highestSalePriceCents != null && (
+              <div className="rounded-lg border border-[var(--border)] p-4">
+                <p className="text-xs text-[var(--muted-foreground)] uppercase tracking-wide">Range</p>
+                <p className="text-lg font-bold mt-1">
+                  {formatPrice(sneaker.marketStats.lowestSalePriceCents)} — {formatPrice(sneaker.marketStats.highestSalePriceCents)}
+                </p>
+              </div>
+            )}
+            <div className="rounded-lg border border-[var(--border)] p-4">
+              <p className="text-xs text-[var(--muted-foreground)] uppercase tracking-wide">Total Traded</p>
+              <p className="text-lg font-bold mt-1">{sneaker.marketStats.totalSold}</p>
+            </div>
+            <div className="rounded-lg border border-[var(--border)] p-4">
+              <p className="text-xs text-[var(--muted-foreground)] uppercase tracking-wide">In Vault</p>
+              <p className="text-lg font-bold mt-1">{sneaker.marketStats.totalVaultItems}</p>
+            </div>
+            <div className="rounded-lg border border-[var(--border)] p-4">
+              <p className="text-xs text-[var(--muted-foreground)] uppercase tracking-wide">Active Listings</p>
+              <p className="text-lg font-bold mt-1">{sneaker.marketStats.activeListingsCount}</p>
+            </div>
+          </div>
+
+          {/* Price History Chart */}
+          {sneaker.priceHistory.length > 0 && (
+            <div className="rounded-lg border border-[var(--border)] p-4">
+              <h2 className="text-lg font-semibold mb-4">Price History</h2>
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart
+                    data={[...sneaker.priceHistory]
+                      .reverse()
+                      .map((p) => ({
+                        date: new Date(p.recordedAt).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+                        price: p.priceCents / 100,
+                      }))}
+                  >
+                    <XAxis dataKey="date" tick={{ fontSize: 12 }} stroke="var(--muted-foreground)" />
+                    <YAxis
+                      tick={{ fontSize: 12 }}
+                      stroke="var(--muted-foreground)"
+                      tickFormatter={(v: number) => `$${v}`}
+                    />
+                    <Tooltip
+                      formatter={(value: number | string | undefined) => [`$${Number(value ?? 0).toFixed(2)}`, "Price"]}
+                      contentStyle={{
+                        backgroundColor: "var(--background)",
+                        border: "1px solid var(--border)",
+                        borderRadius: "8px",
+                        fontSize: "12px",
+                      }}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="price"
+                      stroke="var(--accent)"
+                      strokeWidth={2}
+                      dot={{ fill: "var(--accent)", r: 3 }}
+                      activeDot={{ r: 5 }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
               </div>
             </div>
           )}
-
-          {/* Price History Chart */}
-          <div className="rounded-lg border border-[var(--border)] p-4">
-            <h2 className="text-lg font-semibold mb-4">Price History</h2>
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart
-                  data={[...sneaker.priceHistory]
-                    .reverse()
-                    .map((p) => ({
-                      date: new Date(p.recordedAt).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
-                      price: p.priceCents / 100,
-                    }))}
-                >
-                  <XAxis dataKey="date" tick={{ fontSize: 12 }} stroke="var(--muted-foreground)" />
-                  <YAxis
-                    tick={{ fontSize: 12 }}
-                    stroke="var(--muted-foreground)"
-                    tickFormatter={(v: number) => `$${v}`}
-                  />
-                  <Tooltip
-                    formatter={(value: number | string | undefined) => [`$${Number(value ?? 0).toFixed(2)}`, "Price"]}
-                    contentStyle={{
-                      backgroundColor: "var(--background)",
-                      border: "1px solid var(--border)",
-                      borderRadius: "8px",
-                      fontSize: "12px",
-                    }}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="price"
-                    stroke="var(--accent)"
-                    strokeWidth={2}
-                    dot={{ fill: "var(--accent)", r: 3 }}
-                    activeDot={{ r: 5 }}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
         </div>
       )}
 

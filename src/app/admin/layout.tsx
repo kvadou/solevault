@@ -5,13 +5,15 @@ import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Inbox, Package, ShoppingCart, Database, Loader2 } from "lucide-react";
+import { LayoutDashboard, Inbox, Package, ShoppingCart, Database, Loader2, Gift, Flame } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const NAV_ITEMS = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
   { href: "/admin/submissions", label: "Submissions", icon: Inbox },
   { href: "/admin/inventory", label: "Inventory", icon: Package },
+  { href: "/admin/packs", label: "Packs", icon: Gift },
+  { href: "/admin/drops", label: "Drops", icon: Flame },
   { href: "/admin/orders", label: "Orders", icon: ShoppingCart },
 ];
 
