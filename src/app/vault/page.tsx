@@ -11,6 +11,14 @@ import { Badge } from "@/components/ui/Badge";
 import { Modal } from "@/components/ui/Modal";
 import { formatPrice, conditionLabel } from "@/lib/utils";
 
+interface PricingGuidance {
+  suggestedLowCents: number;
+  suggestedHighCents: number;
+  medianCents: number;
+  recentSalesCount: number;
+  dataSource: string;
+}
+
 interface VaultItem {
   id: string;
   size: string;
@@ -76,6 +84,8 @@ export default function VaultPage() {
   const [showRevShare, setShowRevShare] = useState(false);
   const [incomingBids, setIncomingBids] = useState<IncomingBid[]>([]);
   const [bidActionId, setBidActionId] = useState<string | null>(null);
+  const [pricingGuidance, setPricingGuidance] = useState<PricingGuidance | null>(null);
+  const [pricingLoading, setPricingLoading] = useState(false);
 
   useEffect(() => {
     if (status === "unauthenticated") router.push("/auth/signin");
@@ -99,6 +109,18 @@ export default function VaultPage() {
         .catch(() => {});
     }
   }, [session]);
+
+  function openListModal(item: VaultItem) {
+    setListModal(item);
+    setListPrice("");
+    setPricingGuidance(null);
+    setPricingLoading(true);
+    fetch(`/api/pricing-guidance?sneakerId=${item.sneaker.id}&size=${item.size}&condition=${item.condition}`)
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => setPricingGuidance(data))
+      .catch(() => {})
+      .finally(() => setPricingLoading(false));
+  }
 
   async function handleList() {
     if (!listModal || !listPrice) return;
@@ -360,7 +382,7 @@ export default function VaultPage() {
                   {item.status === "vaulted" && (
                     <>
                       <button
-                        onClick={() => { setListModal(item); setListPrice(""); }}
+                        onClick={() => openListModal(item)}
                         className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-md bg-[var(--accent)] px-3 py-1.5 text-sm font-medium text-white hover:opacity-90 transition-opacity"
                       >
                         <Tag className="h-3.5 w-3.5" /> List
@@ -394,6 +416,22 @@ export default function VaultPage() {
             <p className="text-sm text-[var(--muted-foreground)]">
               {listModal.sneaker.brand} {listModal.sneaker.model} — Size {listModal.size}
             </p>
+            {/* Pricing Guidance */}
+            {pricingLoading ? (
+              <div className="flex items-center gap-2 text-sm text-[var(--muted-foreground)]">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                Loading price suggestion...
+              </div>
+            ) : pricingGuidance ? (
+              <div className="rounded-md bg-blue-50 border border-blue-100 p-3 space-y-1">
+                <p className="text-sm font-medium text-blue-900">
+                  Suggested: {formatPrice(pricingGuidance.suggestedLowCents)} — {formatPrice(pricingGuidance.suggestedHighCents)}
+                </p>
+                <p className="text-xs text-blue-700">
+                  Median: {formatPrice(pricingGuidance.medianCents)} · Based on {pricingGuidance.recentSalesCount} recent {pricingGuidance.dataSource === "sales" ? "sales" : pricingGuidance.dataSource === "listings" ? "listings" : "retail data"}
+                </p>
+              </div>
+            ) : null}
             <div>
               <label className="block text-sm font-medium mb-1.5">Asking Price (USD)</label>
               <input
