@@ -12,6 +12,11 @@ interface Listing {
     size: string;
     condition: string;
     imageUrls: string[];
+    owner?: {
+      id: string;
+      name: string | null;
+      sellerLevel?: string;
+    };
     sneaker: {
       id: string;
       brand: string;

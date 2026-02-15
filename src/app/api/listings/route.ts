@@ -48,7 +48,7 @@ export async function GET(req: Request) {
       vaultItem: {
         include: {
           sneaker: true,
-          owner: { select: { id: true, name: true } },
+          owner: { select: { id: true, name: true, sellerLevel: true } },
         },
       },
     },

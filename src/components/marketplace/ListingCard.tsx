@@ -3,6 +3,8 @@
 import Image from "next/image";
 import Link from "next/link";
 import { formatPrice, conditionLabel } from "@/lib/utils";
+import { SellerBadge } from "@/components/ui/SellerBadge";
+import type { SellerLevel } from "@/lib/seller-levels";
 
 interface ListingCardProps {
   listing: {
@@ -13,6 +15,11 @@ interface ListingCardProps {
       size: string;
       condition: string;
       imageUrls: string[];
+      owner?: {
+        id: string;
+        name: string | null;
+        sellerLevel?: string;
+      };
       sneaker: {
         id: string;
         brand: string;
@@ -49,7 +56,12 @@ export function ListingCard({ listing }: ListingCardProps) {
         </div>
       </div>
       <div className="p-3 space-y-1">
-        <p className="text-xs text-[var(--muted-foreground)] uppercase tracking-wide">{sneaker.brand}</p>
+        <div className="flex items-center justify-between">
+          <p className="text-xs text-[var(--muted-foreground)] uppercase tracking-wide">{sneaker.brand}</p>
+          {vaultItem.owner?.sellerLevel && (
+            <SellerBadge level={vaultItem.owner.sellerLevel as SellerLevel} />
+          )}
+        </div>
         <p className="text-sm font-medium truncate">{sneaker.model}</p>
         {sneaker.colorway && (
           <p className="text-xs text-[var(--muted-foreground)] truncate">{sneaker.colorway}</p>
