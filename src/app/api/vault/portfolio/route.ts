@@ -36,6 +36,7 @@ export async function GET() {
       totalGainCents: 0,
       itemCount: 0,
       items: [],
+      history: [],
     });
   }
 
@@ -178,11 +179,101 @@ export async function GET() {
   const totalCostCents = items.reduce((sum, i) => sum + i.costBasisCents, 0);
   const totalGainCents = totalValueCents - totalCostCents;
 
+  // --- Build 30-day portfolio value history ---
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+  const uniqueSneakerIds = [...new Set(vaultItems.map((vi) => vi.sneakerId))];
+
+  const priceHistoryRecords = await prisma.priceHistory.findMany({
+    where: {
+      sneakerId: { in: uniqueSneakerIds },
+      recordedAt: { gte: thirtyDaysAgo },
+    },
+    orderBy: { recordedAt: "asc" },
+    select: {
+      sneakerId: true,
+      size: true,
+      priceCents: true,
+      recordedAt: true,
+    },
+  });
+
+  // Build a map: "sneakerId|size" -> sorted array of { date, priceCents }
+  const historyBySneakerSize = new Map<
+    string,
+    Array<{ date: string; priceCents: number }>
+  >();
+  for (const rec of priceHistoryRecords) {
+    const key = `${rec.sneakerId}|${rec.size}`;
+    const dateStr = rec.recordedAt.toISOString().slice(0, 10);
+    if (!historyBySneakerSize.has(key)) {
+      historyBySneakerSize.set(key, []);
+    }
+    historyBySneakerSize.get(key)!.push({
+      date: dateStr,
+      priceCents: rec.priceCents,
+    });
+  }
+
+  // For each vault item, determine its baseline value (retail or cost basis fallback)
+  const itemBaselines = vaultItems.map((vi) => {
+    const key = `${vi.sneakerId}|${vi.size}`;
+    const currentValue =
+      listingPriceMap.get(key) ??
+      priceHistoryMap.get(key) ??
+      vi.askingPriceCents ??
+      vi.sneaker.retailPriceCents ??
+      0;
+    const baseline = vi.sneaker.retailPriceCents ?? currentValue;
+    return { key, baseline, currentValue };
+  });
+
+  // Generate daily snapshots for the past 30 days
+  const history: Array<{ date: string; valueCents: number }> = [];
+  const today = new Date();
+  for (let d = 0; d <= 30; d++) {
+    const target = new Date(thirtyDaysAgo);
+    target.setDate(thirtyDaysAgo.getDate() + d);
+    if (target > today) break;
+    const dateStr = target.toISOString().slice(0, 10);
+
+    let dayTotal = 0;
+    for (const item of itemBaselines) {
+      const records = historyBySneakerSize.get(item.key);
+      if (records && records.length > 0) {
+        // Find the most recent price on or before this date
+        let price: number | null = null;
+        for (let i = records.length - 1; i >= 0; i--) {
+          if (records[i].date <= dateStr) {
+            price = records[i].priceCents;
+            break;
+          }
+        }
+        if (price !== null) {
+          dayTotal += price;
+        } else {
+          // No price data yet for this date — use baseline
+          dayTotal += item.baseline;
+        }
+      } else {
+        // No price history at all — interpolate between baseline and current
+        const progress = d / 30;
+        dayTotal += Math.round(
+          item.baseline + (item.currentValue - item.baseline) * progress
+        );
+      }
+    }
+
+    history.push({ date: dateStr, valueCents: dayTotal });
+  }
+
   return NextResponse.json({
     totalValueCents,
     totalCostCents,
     totalGainCents,
     itemCount: items.length,
     items,
+    history,
   });
 }
