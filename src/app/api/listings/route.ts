@@ -82,5 +82,38 @@ export async function POST(req: Request) {
     }),
   ]);
 
+  // Fire-and-forget: check for watchlist price alerts
+  try {
+    const vaultItem = await prisma.vaultItem.findUnique({
+      where: { id: vaultItemId },
+      select: { sneakerId: true },
+    });
+
+    if (vaultItem) {
+      const watchlistMatches = await prisma.watchlist.findMany({
+        where: {
+          sneakerId: vaultItem.sneakerId,
+          targetPriceCents: { gte: priceCents },
+          userId: { not: session.user.id },
+        },
+        include: { sneaker: { select: { brand: true, model: true } } },
+      });
+
+      if (watchlistMatches.length > 0) {
+        await prisma.notification.createMany({
+          data: watchlistMatches.map((w) => ({
+            userId: w.userId,
+            type: "price_alert",
+            title: "Price Alert!",
+            message: `${w.sneaker.brand} ${w.sneaker.model} is now listed at $${(priceCents / 100).toFixed(2)} — at or below your target of $${(w.targetPriceCents! / 100).toFixed(2)}`,
+            link: `/sneakers/${vaultItem.sneakerId}`,
+          })),
+        });
+      }
+    }
+  } catch {
+    // Notification failures should not break listing creation
+  }
+
   return NextResponse.json(listing);
 }

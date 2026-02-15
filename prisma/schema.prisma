@@ -37,6 +37,7 @@ model User {
   ownershipFrom        OwnershipRecord[]      @relation("OwnershipFrom")
   ownershipTo          OwnershipRecord[]      @relation("OwnershipTo")
   bids                 Bid[]                  @relation("BidderBids")
+  notifications        Notification[]
 }
 
 model Account {
@@ -401,4 +402,20 @@ model Bid {
 
   @@index([sneakerId, status])
   @@index([bidderId, createdAt])
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  type      String   // "price_alert" | "bid_received" | "bid_accepted" | "bid_declined" | "order_completed"
+  title     String
+  message   String
+  link      String?  // URL to navigate to on click
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, read])
+  @@index([userId, createdAt])
 }
