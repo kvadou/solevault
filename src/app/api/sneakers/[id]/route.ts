@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { auth } from "@/lib/auth";
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -43,6 +44,50 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     },
   });
 
+  // Count ALL vaulted items (not just listed)
+  const totalVaultItems = await prisma.vaultItem.count({
+    where: { sneakerId: id, status: { in: ["vaulted", "listed"] } },
+  });
+
+  // Count active listings
+  const activeListingsCount = await prisma.listing.count({
+    where: {
+      vaultItem: { sneakerId: id },
+      status: "active",
+    },
+  });
+
+  // Find lowest ask (cheapest active listing)
+  const lowestListing = await prisma.listing.findFirst({
+    where: {
+      vaultItem: { sneakerId: id },
+      status: "active",
+    },
+    orderBy: { priceCents: "asc" },
+    select: { priceCents: true },
+  });
+  const lowestAskCents = lowestListing?.priceCents ?? null;
+
+  // Check watchlist status for current user
+  const session = await auth();
+  let isWatching = false;
+  let watchlistId: string | null = null;
+  if (session?.user?.id) {
+    const watchEntry = await prisma.watchlist.findUnique({
+      where: {
+        userId_sneakerId: {
+          userId: session.user.id,
+          sneakerId: id,
+        },
+      },
+      select: { id: true },
+    });
+    if (watchEntry) {
+      isWatching = true;
+      watchlistId = watchEntry.id;
+    }
+  }
+
   return NextResponse.json({
     ...sneaker,
     marketStats: {
@@ -51,6 +96,11 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       lowestSalePriceCents,
       highestSalePriceCents,
       totalSold,
+      totalVaultItems,
+      activeListingsCount,
+      lowestAskCents,
     },
+    isWatching,
+    watchlistId,
   });
 }
