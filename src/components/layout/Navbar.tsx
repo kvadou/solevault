@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useSession, signOut } from "next-auth/react";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { Menu, X, Vault, ShoppingBag, LayoutDashboard, LogOut, User, Wallet, Gift, Flame, Eye, Bell } from "lucide-react";
+import { Menu, X, Vault, ShoppingBag, LayoutDashboard, LogOut, User, Wallet, Gift, Flame, Eye, Bell, PieChart } from "lucide-react";
 import { formatPrice } from "@/lib/utils";
 
 interface Notification {
@@ -124,6 +124,9 @@ export function Navbar() {
               <>
                 <Link href="/vault" className="text-sm font-medium hover:text-[var(--accent)] transition-colors">
                   My Vault
+                </Link>
+                <Link href="/vault/portfolio" className="text-sm font-medium hover:text-[var(--accent)] transition-colors">
+                  Portfolio
                 </Link>
                 <Link href="/orders" className="text-sm font-medium hover:text-[var(--accent)] transition-colors">
                   Orders
@@ -258,6 +261,9 @@ export function Navbar() {
             <>
               <Link href="/vault" className="flex items-center gap-2 text-sm py-2" onClick={() => setMobileOpen(false)}>
                 <Vault className="h-4 w-4" /> My Vault
+              </Link>
+              <Link href="/vault/portfolio" className="flex items-center gap-2 text-sm py-2" onClick={() => setMobileOpen(false)}>
+                <PieChart className="h-4 w-4" /> Portfolio
               </Link>
               <Link href="/orders" className="flex items-center gap-2 text-sm py-2" onClick={() => setMobileOpen(false)}>
                 <ShoppingBag className="h-4 w-4" /> Orders
