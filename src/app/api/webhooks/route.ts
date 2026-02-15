@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { stripe } from "@/lib/stripe";
 import Stripe from "stripe";
+import { createOwnershipRecord } from "@/lib/ownership";
 
 export async function POST(req: Request) {
   const body = await req.text();
@@ -21,6 +22,35 @@ export async function POST(req: Request) {
 
   if (event.type === "checkout.session.completed") {
     const session = event.data.object as Stripe.Checkout.Session;
+
+    // Handle wallet deposits
+    if (session.metadata?.type === "wallet_deposit") {
+      const userId = session.metadata.userId;
+      const amountCents = parseInt(session.metadata.amountCents);
+
+      if (userId && amountCents) {
+        const updatedUser = await prisma.user.update({
+          where: { id: userId },
+          data: { balanceCents: { increment: amountCents } },
+          select: { balanceCents: true },
+        });
+
+        await prisma.walletTransaction.create({
+          data: {
+            userId,
+            type: "deposit",
+            amountCents,
+            balanceAfterCents: updatedUser.balanceCents,
+            description: `Wallet deposit of $${(amountCents / 100).toFixed(2)}`,
+            stripePaymentIntentId: session.payment_intent as string,
+          },
+        });
+      }
+
+      return NextResponse.json({ received: true });
+    }
+
+    // Handle marketplace orders
     const orderId = session.metadata?.orderId;
 
     if (!orderId) return NextResponse.json({ received: true });
@@ -53,6 +83,32 @@ export async function POST(req: Request) {
         data: { balanceCents: { increment: order.salePriceCents - order.sellerFeeCents } },
       }),
     ]);
+
+    // Record ownership transfer
+    await createOwnershipRecord({
+      vaultItemId: order.vaultItemId,
+      fromUserId: order.sellerId,
+      toUserId: order.buyerId,
+      eventType: "marketplace_sale",
+      orderId: order.id,
+    });
+
+    // Record price history
+    const vaultItemData = await prisma.vaultItem.findUnique({
+      where: { id: order.vaultItemId },
+      select: { sneakerId: true, size: true },
+    });
+
+    if (vaultItemData) {
+      await prisma.priceHistory.create({
+        data: {
+          sneakerId: vaultItemData.sneakerId,
+          size: vaultItemData.size,
+          priceCents: order.salePriceCents,
+          source: "platform",
+        },
+      });
+    }
   }
 
   return NextResponse.json({ received: true });

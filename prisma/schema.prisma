@@ -16,7 +16,8 @@ model User {
   hashedPassword  String?
   role            String    @default("user") // "user" | "admin"
   balanceCents    Int       @default(0)
-  stripeCustomerId String?
+  stripeCustomerId      String?
+  stripeConnectAccountId String?
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
@@ -28,6 +29,12 @@ model User {
   sellOrders      Order[]   @relation("SellerOrders")
   submissions     VaultSubmission[]
   watchlist       Watchlist[]
+  walletTransactions  WalletTransaction[]
+  packRips            PackRip[]
+  buybackTransactions BuybackTransaction[] @relation("UserBuybacks")
+  authenticatorReports AuthenticationReport[] @relation("AuthenticatorReports")
+  ownershipFrom        OwnershipRecord[]      @relation("OwnershipFrom")
+  ownershipTo          OwnershipRecord[]      @relation("OwnershipTo")
 }
 
 model Account {
@@ -89,23 +96,29 @@ model VaultItem {
   size                 String
   condition            String   // "deadstock" | "vnds" | "excellent" | "good"
   status               String   @default("pending_auth")
-  // "pending_auth" | "authenticated" | "vaulted" | "listed" | "sold" | "redeemed"
+  // "pending_auth" | "authenticated" | "vaulted" | "packed" | "listed" | "sold" | "redeemed"
   authenticationStatus String   @default("pending")
   // "pending" | "passed" | "failed"
   askingPriceCents     Int?
+  fmvOverrideCents     Int?
   vaultLocation        String?
   imageUrls            String[]
   notes                String?
   vaultedAt            DateTime?
   submissionId         String?
+  nfcChipId            String?  @unique
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
 
   owner      User            @relation(fields: [ownerId], references: [id])
   sneaker    Sneaker         @relation(fields: [sneakerId], references: [id])
   submission VaultSubmission? @relation(fields: [submissionId], references: [id])
-  listings   Listing[]
-  orders     Order[]
+  listings           Listing[]
+  orders             Order[]
+  packPoolItems      PackPoolItem[]
+  buybackTransactions BuybackTransaction[]
+  authReport          AuthenticationReport?
+  ownershipHistory    OwnershipRecord[]
 }
 
 model Listing {
@@ -182,4 +195,165 @@ model Watchlist {
   sneaker Sneaker @relation(fields: [sneakerId], references: [id])
 
   @@unique([userId, sneakerId])
+}
+
+model WalletTransaction {
+  id                    String   @id @default(cuid())
+  userId                String
+  type                  String   // "deposit" | "withdrawal" | "purchase" | "sale" | "buyback" | "revenue_share" | "refund"
+  amountCents           Int      // positive = credit, negative = debit
+  balanceAfterCents     Int
+  description           String
+  stripePaymentIntentId String?
+  stripeTransferId      String?
+  referenceType         String?  // "pack_rip" | "order" | "buyback" | "redemption"
+  referenceId           String?
+  createdAt             DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId, createdAt])
+}
+
+model Drop {
+  id                  String    @id @default(cuid())
+  name                String
+  slug                String    @unique
+  description         String?
+  imageUrl            String?
+  theme               String?
+  startsAt            DateTime
+  endsAt              DateTime?
+  status              String    @default("upcoming") // "upcoming" | "live" | "sold_out" | "ended"
+  maxPurchasesPerUser Int       @default(1)
+  createdAt           DateTime  @default(now())
+
+  packTiers PackTier[]
+}
+
+model PackTier {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  priceCents  Int
+  imageUrl    String?
+  description String?
+  totalSupply Int
+  soldCount   Int      @default(0)
+  status      String   @default("active") // "active" | "sold_out" | "paused"
+  dropId      String?
+  createdAt   DateTime @default(now())
+
+  drop      Drop?          @relation(fields: [dropId], references: [id])
+  poolItems PackPoolItem[]
+  rips      PackRip[]
+}
+
+model PackPoolItem {
+  id          String    @id @default(cuid())
+  packTierId  String
+  vaultItemId String
+  oddsWeight  Int       @default(1)
+  status      String    @default("available") // "available" | "claimed"
+  claimedAt   DateTime?
+
+  packTier  PackTier  @relation(fields: [packTierId], references: [id])
+  vaultItem VaultItem @relation(fields: [vaultItemId], references: [id])
+
+  rips PackRip[]
+
+  @@index([packTierId, status])
+}
+
+model PackRip {
+  id                   String    @id @default(cuid())
+  userId               String
+  packTierId           String
+  packPoolItemId       String?
+  priceCents           Int
+  platformRevenueCents Int
+  status               String    @default("pending") // "pending" | "revealed" | "buyback"
+  revealedAt           DateTime?
+  createdAt            DateTime  @default(now())
+
+  user         User          @relation(fields: [userId], references: [id])
+  packTier     PackTier      @relation(fields: [packTierId], references: [id])
+  packPoolItem PackPoolItem? @relation(fields: [packPoolItemId], references: [id])
+
+  @@index([userId, createdAt])
+}
+
+model BuybackTransaction {
+  id                   String   @id @default(cuid())
+  userId               String
+  vaultItemId          String
+  fmvCents             Int
+  payoutCents          Int      // 85% of FMV
+  platformRevenueCents Int      // 15% spread
+  createdAt            DateTime @default(now())
+
+  user      User      @relation("UserBuybacks", fields: [userId], references: [id])
+  vaultItem VaultItem @relation(fields: [vaultItemId], references: [id])
+
+  @@index([userId, createdAt])
+}
+
+model AuthenticationReport {
+  id                String   @id @default(cuid())
+  vaultItemId       String   @unique
+  authenticatorId   String?
+  aiConfidenceScore Float?
+  aiProvider        String?
+  overallResult     String   // "passed" | "failed" | "inconclusive"
+  notes             String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  vaultItem     VaultItem       @relation(fields: [vaultItemId], references: [id])
+  authenticator User?           @relation("AuthenticatorReports", fields: [authenticatorId], references: [id])
+  checkpoints   AuthCheckpoint[]
+  photos        AuthPhoto[]
+}
+
+model AuthCheckpoint {
+  id        String @id @default(cuid())
+  reportId  String
+  name      String
+  result    String // "pass" | "fail" | "warning"
+  notes     String?
+  sortOrder Int
+
+  report AuthenticationReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
+  @@index([reportId])
+}
+
+model AuthPhoto {
+  id        String   @id @default(cuid())
+  reportId  String
+  angle     String
+  imageUrl  String
+  sortOrder Int
+  createdAt DateTime @default(now())
+
+  report AuthenticationReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
+  @@index([reportId])
+}
+
+model OwnershipRecord {
+  id          String   @id @default(cuid())
+  vaultItemId String
+  fromUserId  String?
+  toUserId    String
+  eventType   String   // "vault_submission" | "marketplace_sale" | "pack_reveal" | "redemption"
+  orderId     String?
+  packRipId   String?
+  createdAt   DateTime @default(now())
+
+  vaultItem VaultItem @relation(fields: [vaultItemId], references: [id])
+  fromUser  User?     @relation("OwnershipFrom", fields: [fromUserId], references: [id])
+  toUser    User      @relation("OwnershipTo", fields: [toUserId], references: [id])
+
+  @@index([vaultItemId, createdAt])
 }

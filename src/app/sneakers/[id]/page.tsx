@@ -3,10 +3,12 @@
 import { useState, useEffect, use } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import Image from "next/image";
 import { Loader2, Shield, Vault, TrendingUp } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
 import { Modal } from "@/components/ui/Modal";
+import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { formatPrice, conditionLabel, calculateFees } from "@/lib/utils";
 
 interface SneakerDetail {
@@ -27,6 +29,13 @@ interface SneakerDetail {
     owner: { id: string; name: string | null };
   }>;
   priceHistory: Array<{ priceCents: number; recordedAt: string; size: string }>;
+  marketStats?: {
+    lastSalePriceCents: number | null;
+    avgSalePriceCents: number | null;
+    lowestSalePriceCents: number | null;
+    highestSalePriceCents: number | null;
+    totalSold: number;
+  };
 }
 
 export default function SneakerDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -75,7 +84,7 @@ export default function SneakerDetailPage({ params }: { params: Promise<{ id: st
   }
 
   const activeListing = sneaker.vaultItems
-    .flatMap((v) => v.listings.map((l) => ({ ...l, size: v.size, condition: v.condition, imageUrls: v.imageUrls })))
+    .flatMap((v) => v.listings.map((l) => ({ ...l, vaultItemId: v.id, size: v.size, condition: v.condition, imageUrls: v.imageUrls })))
     .sort((a, b) => a.priceCents - b.priceCents);
 
   const lowestPrice = activeListing[0]?.priceCents;
@@ -135,6 +144,9 @@ export default function SneakerDetailPage({ params }: { params: Promise<{ id: st
                         Size {l.size}
                       </span>
                       <span className="text-xs text-[var(--muted-foreground)]">{conditionLabel(l.condition)}</span>
+                      <Link href={`/certificate/${l.vaultItemId}`} className="text-xs text-[var(--accent)] hover:underline inline-flex items-center gap-1">
+                        <Shield className="h-3 w-3" /> Verified
+                      </Link>
                     </div>
                     <div className="flex items-center gap-3">
                       <span className="font-bold">{formatPrice(l.priceCents)}</span>
@@ -155,6 +167,82 @@ export default function SneakerDetailPage({ params }: { params: Promise<{ id: st
           </div>
         </div>
       </div>
+
+      {/* Market Data & Price History */}
+      {sneaker.priceHistory.length > 0 && (
+        <div className="mt-8 space-y-6">
+          {/* Market Stats Bar */}
+          {sneaker.marketStats && (
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+              {sneaker.marketStats.lastSalePriceCents != null && (
+                <div className="rounded-lg border border-[var(--border)] p-4">
+                  <p className="text-xs text-[var(--muted-foreground)] uppercase tracking-wide">Last Sale</p>
+                  <p className="text-lg font-bold mt-1">{formatPrice(sneaker.marketStats.lastSalePriceCents)}</p>
+                </div>
+              )}
+              {sneaker.marketStats.avgSalePriceCents != null && (
+                <div className="rounded-lg border border-[var(--border)] p-4">
+                  <p className="text-xs text-[var(--muted-foreground)] uppercase tracking-wide">Average</p>
+                  <p className="text-lg font-bold mt-1">{formatPrice(sneaker.marketStats.avgSalePriceCents)}</p>
+                </div>
+              )}
+              {sneaker.marketStats.lowestSalePriceCents != null && sneaker.marketStats.highestSalePriceCents != null && (
+                <div className="rounded-lg border border-[var(--border)] p-4">
+                  <p className="text-xs text-[var(--muted-foreground)] uppercase tracking-wide">Range</p>
+                  <p className="text-lg font-bold mt-1">
+                    {formatPrice(sneaker.marketStats.lowestSalePriceCents)} — {formatPrice(sneaker.marketStats.highestSalePriceCents)}
+                  </p>
+                </div>
+              )}
+              <div className="rounded-lg border border-[var(--border)] p-4">
+                <p className="text-xs text-[var(--muted-foreground)] uppercase tracking-wide">Total Traded</p>
+                <p className="text-lg font-bold mt-1">{sneaker.marketStats.totalSold}</p>
+              </div>
+            </div>
+          )}
+
+          {/* Price History Chart */}
+          <div className="rounded-lg border border-[var(--border)] p-4">
+            <h2 className="text-lg font-semibold mb-4">Price History</h2>
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart
+                  data={[...sneaker.priceHistory]
+                    .reverse()
+                    .map((p) => ({
+                      date: new Date(p.recordedAt).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+                      price: p.priceCents / 100,
+                    }))}
+                >
+                  <XAxis dataKey="date" tick={{ fontSize: 12 }} stroke="var(--muted-foreground)" />
+                  <YAxis
+                    tick={{ fontSize: 12 }}
+                    stroke="var(--muted-foreground)"
+                    tickFormatter={(v: number) => `$${v}`}
+                  />
+                  <Tooltip
+                    formatter={(value: number | string | undefined) => [`$${Number(value ?? 0).toFixed(2)}`, "Price"]}
+                    contentStyle={{
+                      backgroundColor: "var(--background)",
+                      border: "1px solid var(--border)",
+                      borderRadius: "8px",
+                      fontSize: "12px",
+                    }}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="price"
+                    stroke="var(--accent)"
+                    strokeWidth={2}
+                    dot={{ fill: "var(--accent)", r: 3 }}
+                    activeDot={{ r: 5 }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Purchase confirmation modal */}
       <Modal
