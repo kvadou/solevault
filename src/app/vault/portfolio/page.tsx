@@ -13,7 +13,16 @@ import {
   ArrowDownRight,
   Package,
 } from "lucide-react";
+import {
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+} from "recharts";
 import { Badge } from "@/components/ui/Badge";
+import { toast } from "@/components/ui/Toast";
 import { formatPrice, conditionLabel } from "@/lib/utils";
 
 interface PortfolioItem {
@@ -33,12 +42,18 @@ interface PortfolioItem {
   gainPercent: number | null;
 }
 
+interface PortfolioHistoryPoint {
+  date: string;
+  valueCents: number;
+}
+
 interface PortfolioData {
   totalValueCents: number;
   totalCostCents: number;
   totalGainCents: number;
   itemCount: number;
   items: PortfolioItem[];
+  history: PortfolioHistoryPoint[];
 }
 
 export default function PortfolioPage() {
@@ -54,9 +69,16 @@ export default function PortfolioPage() {
   useEffect(() => {
     if (session) {
       fetch("/api/vault/portfolio")
-        .then((r) => r.json())
+        .then((r) => {
+          if (!r.ok) throw new Error("Failed to load");
+          return r.json();
+        })
         .then((data) => {
           setPortfolio(data);
+          setLoading(false);
+        })
+        .catch(() => {
+          toast("Failed to load portfolio", "error");
           setLoading(false);
         });
     }
@@ -185,6 +207,65 @@ export default function PortfolioPage() {
           <p className="text-2xl font-bold">{portfolio.itemCount}</p>
         </div>
       </div>
+
+      {/* Portfolio Value Chart */}
+      {portfolio.history.length > 1 && (
+        <div className="rounded-lg border border-[var(--border)] p-4 mb-8">
+          <h2 className="text-lg font-semibold mb-4">Portfolio Value — Last 30 Days</h2>
+          <div className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart
+                data={portfolio.history.map((p) => ({
+                  date: new Date(p.date).toLocaleDateString("en-US", {
+                    month: "short",
+                    day: "numeric",
+                  }),
+                  value: p.valueCents / 100,
+                }))}
+              >
+                <defs>
+                  <linearGradient id="portfolioFill" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="var(--accent)" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="var(--accent)" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <XAxis
+                  dataKey="date"
+                  tick={{ fontSize: 12 }}
+                  stroke="var(--muted-foreground)"
+                />
+                <YAxis
+                  tick={{ fontSize: 12 }}
+                  stroke="var(--muted-foreground)"
+                  tickFormatter={(v: number) => `$${v.toLocaleString()}`}
+                />
+                <Tooltip
+                  formatter={(value: number | string | undefined) => [
+                    `$${Number(value ?? 0).toLocaleString(undefined, {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}`,
+                    "Portfolio Value",
+                  ]}
+                  contentStyle={{
+                    backgroundColor: "var(--background)",
+                    border: "1px solid var(--border)",
+                    borderRadius: "8px",
+                    fontSize: "12px",
+                  }}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="value"
+                  stroke="var(--accent)"
+                  strokeWidth={2}
+                  fill="url(#portfolioFill)"
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      )}
 
       {/* Items Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">

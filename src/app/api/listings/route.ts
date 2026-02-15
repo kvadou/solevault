@@ -48,7 +48,7 @@ export async function GET(req: Request) {
       vaultItem: {
         include: {
           sneaker: true,
-          owner: { select: { id: true, name: true } },
+          owner: { select: { id: true, name: true, sellerLevel: true } },
         },
       },
     },
@@ -93,7 +93,7 @@ export async function POST(req: Request) {
       const watchlistMatches = await prisma.watchlist.findMany({
         where: {
           sneakerId: vaultItem.sneakerId,
-          targetPriceCents: { gte: priceCents },
+          targetPriceCents: { not: null, gte: priceCents },
           userId: { not: session.user.id },
         },
         include: { sneaker: { select: { brand: true, model: true } } },
@@ -105,7 +105,7 @@ export async function POST(req: Request) {
             userId: w.userId,
             type: "price_alert",
             title: "Price Alert!",
-            message: `${w.sneaker.brand} ${w.sneaker.model} is now listed at $${(priceCents / 100).toFixed(2)} — at or below your target of $${(w.targetPriceCents! / 100).toFixed(2)}`,
+            message: `${w.sneaker.brand} ${w.sneaker.model} is now listed at $${(priceCents / 100).toFixed(2)} — at or below your target of $${((w.targetPriceCents as number) / 100).toFixed(2)}`,
             link: `/sneakers/${vaultItem.sneakerId}`,
           })),
         });

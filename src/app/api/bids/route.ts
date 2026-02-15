@@ -132,5 +132,31 @@ export async function POST(req: Request) {
     },
   });
 
+  // After bid creation, notify sellers
+  try {
+    const sellerItems = await prisma.vaultItem.findMany({
+      where: {
+        sneakerId,
+        size,
+        status: { in: ["vaulted", "listed"] },
+        ownerId: { not: session.user.id! },
+      },
+      select: { ownerId: true },
+      distinct: ["ownerId"],
+    });
+
+    if (sellerItems.length > 0) {
+      await prisma.notification.createMany({
+        data: sellerItems.map((item) => ({
+          userId: item.ownerId,
+          type: "bid_received",
+          title: "New Offer Received",
+          message: `Someone offered $${(amountCents / 100).toFixed(2)} for your ${sneaker.brand} ${sneaker.model} (Size ${size})`,
+          link: "/vault",
+        })),
+      });
+    }
+  } catch {}
+
   return NextResponse.json(bid, { status: 201 });
 }

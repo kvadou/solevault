@@ -4,6 +4,7 @@ import { auth } from "@/lib/auth";
 import { calculateFees } from "@/lib/utils";
 import { createOwnershipRecord } from "@/lib/ownership";
 import { createRevenueShare } from "@/lib/revenue-share";
+import { getSellerLevel, getFeePercent } from "@/lib/seller-levels";
 
 export async function PATCH(
   req: Request,
@@ -100,6 +101,19 @@ export async function PATCH(
       },
     });
 
+    // Notify bidder their offer was declined
+    try {
+      await prisma.notification.create({
+        data: {
+          userId: bid.bidderId,
+          type: "bid_declined",
+          title: "Offer Declined",
+          message: `Your offer of $${(bid.amountCents / 100).toFixed(2)} for ${bid.sneaker.brand} ${bid.sneaker.model} was declined`,
+          link: `/sneakers/${bid.sneakerId}`,
+        },
+      });
+    } catch {}
+
     return NextResponse.json(updated);
   }
 
@@ -122,7 +136,14 @@ export async function PATCH(
     );
   }
 
-  const fees = calculateFees(bid.amountCents);
+  // Look up seller's sales count to determine their level and fee rate
+  const sellerUser = await prisma.user.findUnique({
+    where: { id: session.user.id! },
+    select: { totalSales: true },
+  });
+  const sellerLevel = getSellerLevel(sellerUser?.totalSales ?? 0);
+  const sellerFeePercent = getFeePercent(sellerLevel);
+  const fees = calculateFees(bid.amountCents, sellerFeePercent);
 
   // Check buyer wallet balance
   const buyer = await prisma.user.findUnique({
@@ -241,6 +262,37 @@ export async function PATCH(
       source: "platform",
     },
   });
+
+  // Increment seller's totalSales and update level if needed
+  try {
+    const updatedSellerUser = await prisma.user.update({
+      where: { id: session.user.id! },
+      data: { totalSales: { increment: 1 } },
+      select: { totalSales: true },
+    });
+    const newLevel = getSellerLevel(updatedSellerUser.totalSales);
+    if (newLevel !== sellerLevel) {
+      await prisma.user.update({
+        where: { id: session.user.id! },
+        data: { sellerLevel: newLevel },
+      });
+    }
+  } catch {
+    // Don't break the order flow if sales count update fails
+  }
+
+  // Notify bidder their offer was accepted
+  try {
+    await prisma.notification.create({
+      data: {
+        userId: bid.bidderId,
+        type: "bid_accepted",
+        title: "Offer Accepted!",
+        message: `Your offer of $${(bid.amountCents / 100).toFixed(2)} for ${bid.sneaker.brand} ${bid.sneaker.model} was accepted`,
+        link: "/vault",
+      },
+    });
+  } catch {}
 
   return NextResponse.json(updatedBid);
 }

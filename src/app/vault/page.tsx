@@ -5,11 +5,19 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import { Loader2, Plus, Tag, PackageOpen, DollarSign, Shield, TrendingUp, ChevronDown, ChevronUp } from "lucide-react";
+import { Loader2, Plus, Tag, PackageOpen, DollarSign, Shield, TrendingUp, ChevronDown, ChevronUp, Award } from "lucide-react";
 import { toast } from "@/components/ui/Toast";
 import { Badge } from "@/components/ui/Badge";
 import { Modal } from "@/components/ui/Modal";
 import { formatPrice, conditionLabel } from "@/lib/utils";
+
+interface PricingGuidance {
+  suggestedLowCents: number;
+  suggestedHighCents: number;
+  medianCents: number;
+  recentSalesCount: number;
+  dataSource: string;
+}
 
 interface VaultItem {
   id: string;
@@ -47,6 +55,15 @@ interface VaultedItemRevenue {
   revenue: { totalRevenueCents: number; totalShareCents: number; tradeCount: number };
 }
 
+interface SellerLevelInfo {
+  level: string;
+  label: string;
+  color: string;
+  feePercent: number;
+  totalSales: number;
+  nextLevel: { level: string; label: string; salesNeeded: number } | null;
+}
+
 interface IncomingBid {
   id: string;
   sneakerId: string;
@@ -76,6 +93,9 @@ export default function VaultPage() {
   const [showRevShare, setShowRevShare] = useState(false);
   const [incomingBids, setIncomingBids] = useState<IncomingBid[]>([]);
   const [bidActionId, setBidActionId] = useState<string | null>(null);
+  const [pricingGuidance, setPricingGuidance] = useState<PricingGuidance | null>(null);
+  const [pricingLoading, setPricingLoading] = useState(false);
+  const [sellerLevel, setSellerLevel] = useState<SellerLevelInfo | null>(null);
 
   useEffect(() => {
     if (status === "unauthenticated") router.push("/auth/signin");
@@ -97,8 +117,24 @@ export default function VaultPage() {
         .then((r) => r.json())
         .then((data) => { if (Array.isArray(data)) setIncomingBids(data); })
         .catch(() => {});
+      fetch("/api/seller-level")
+        .then((r) => r.ok ? r.json() : null)
+        .then((data) => setSellerLevel(data))
+        .catch(() => {});
     }
   }, [session]);
+
+  function openListModal(item: VaultItem) {
+    setListModal(item);
+    setListPrice("");
+    setPricingGuidance(null);
+    setPricingLoading(true);
+    fetch(`/api/pricing-guidance?sneakerId=${item.sneaker.id}&size=${item.size}&condition=${item.condition}`)
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => setPricingGuidance(data))
+      .catch(() => {})
+      .finally(() => setPricingLoading(false));
+  }
 
   async function handleList() {
     if (!listModal || !listPrice) return;
@@ -207,6 +243,53 @@ export default function VaultPage() {
           Vault a Pair
         </Link>
       </div>
+
+      {/* Seller Level */}
+      {sellerLevel && (
+        <div className="mb-8 rounded-lg border border-[var(--border)] p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${
+                sellerLevel.color === "amber" ? "bg-amber-100 text-amber-600" :
+                sellerLevel.color === "gray" ? "bg-gray-200 text-gray-600" :
+                sellerLevel.color === "yellow" ? "bg-yellow-100 text-yellow-600" :
+                "bg-purple-100 text-purple-600"
+              }`}>
+                <Award className="h-5 w-5" />
+              </div>
+              <div>
+                <h3 className="font-semibold">{sellerLevel.label} Seller</h3>
+                <p className="text-sm text-[var(--muted-foreground)]">
+                  {sellerLevel.totalSales} sale{sellerLevel.totalSales !== 1 ? "s" : ""} · {sellerLevel.feePercent}% fees
+                </p>
+              </div>
+            </div>
+            {sellerLevel.nextLevel && (
+              <div className="text-right">
+                <p className="text-sm font-medium">{sellerLevel.nextLevel.salesNeeded} more sale{sellerLevel.nextLevel.salesNeeded !== 1 ? "s" : ""}</p>
+                <p className="text-xs text-[var(--muted-foreground)]">to reach {sellerLevel.nextLevel.label}</p>
+              </div>
+            )}
+          </div>
+          {sellerLevel.nextLevel && (
+            <div className="mt-3">
+              <div className="h-2 rounded-full bg-[var(--muted)] overflow-hidden">
+                <div
+                  className={`h-full rounded-full ${
+                    sellerLevel.color === "amber" ? "bg-amber-500" :
+                    sellerLevel.color === "gray" ? "bg-gray-500" :
+                    sellerLevel.color === "yellow" ? "bg-yellow-500" :
+                    "bg-purple-500"
+                  }`}
+                  style={{
+                    width: `${Math.min(100, ((sellerLevel.totalSales) / (sellerLevel.totalSales + sellerLevel.nextLevel.salesNeeded)) * 100)}%`,
+                  }}
+                />
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Revenue Share Section */}
       {revShareSummary && revShareSummary.totalEarnedCents > 0 && (
@@ -360,7 +443,7 @@ export default function VaultPage() {
                   {item.status === "vaulted" && (
                     <>
                       <button
-                        onClick={() => { setListModal(item); setListPrice(""); }}
+                        onClick={() => openListModal(item)}
                         className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-md bg-[var(--accent)] px-3 py-1.5 text-sm font-medium text-white hover:opacity-90 transition-opacity"
                       >
                         <Tag className="h-3.5 w-3.5" /> List
@@ -394,6 +477,22 @@ export default function VaultPage() {
             <p className="text-sm text-[var(--muted-foreground)]">
               {listModal.sneaker.brand} {listModal.sneaker.model} — Size {listModal.size}
             </p>
+            {/* Pricing Guidance */}
+            {pricingLoading ? (
+              <div className="flex items-center gap-2 text-sm text-[var(--muted-foreground)]">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                Loading price suggestion...
+              </div>
+            ) : pricingGuidance ? (
+              <div className="rounded-md bg-blue-50 border border-blue-100 p-3 space-y-1">
+                <p className="text-sm font-medium text-blue-900">
+                  Suggested: {formatPrice(pricingGuidance.suggestedLowCents)} — {formatPrice(pricingGuidance.suggestedHighCents)}
+                </p>
+                <p className="text-xs text-blue-700">
+                  Median: {formatPrice(pricingGuidance.medianCents)} · Based on {pricingGuidance.recentSalesCount} recent {pricingGuidance.dataSource === "sales" ? "sales" : pricingGuidance.dataSource === "listings" ? "listings" : "retail data"}
+                </p>
+              </div>
+            ) : null}
             <div>
               <label className="block text-sm font-medium mb-1.5">Asking Price (USD)</label>
               <input
@@ -407,7 +506,10 @@ export default function VaultPage() {
               />
               {listPrice && (
                 <p className="text-xs text-[var(--muted-foreground)] mt-1">
-                  You&apos;ll receive {formatPrice(Math.round(parseFloat(listPrice) * 100 * 0.975))} after 2.5% seller fee
+                  You&apos;ll receive {formatPrice(Math.round(parseFloat(listPrice) * 100 * (1 - (sellerLevel?.feePercent ?? 5) / 100)))} after {sellerLevel?.feePercent ?? 5}% seller fee
+                  {sellerLevel && sellerLevel.level !== "bronze" && (
+                    <span className="ml-1 text-green-600">({sellerLevel.label} rate)</span>
+                  )}
                 </p>
               )}
             </div>

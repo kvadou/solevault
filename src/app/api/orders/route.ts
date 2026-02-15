@@ -5,6 +5,7 @@ import { stripe } from "@/lib/stripe";
 import { calculateFees } from "@/lib/utils";
 import { createOwnershipRecord } from "@/lib/ownership";
 import { createRevenueShare } from "@/lib/revenue-share";
+import { getSellerLevel, getFeePercent } from "@/lib/seller-levels";
 
 export async function GET() {
   const session = await auth();
@@ -48,7 +49,14 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Cannot buy your own listing" }, { status: 400 });
   }
 
-  const fees = calculateFees(listing.priceCents);
+  // Look up seller's sales count to determine their level and fee rate
+  const seller = await prisma.user.findUnique({
+    where: { id: listing.sellerId },
+    select: { totalSales: true },
+  });
+  const sellerLevel = getSellerLevel(seller?.totalSales ?? 0);
+  const sellerFeePercent = getFeePercent(sellerLevel);
+  const fees = calculateFees(listing.priceCents, sellerFeePercent);
   const totalCost = fees.totalBuyerPays;
 
   // Check wallet balance
@@ -113,6 +121,24 @@ export async function POST(req: Request) {
       sourceId: order.id,
       totalRevenueCents: fees.platformRevenueCents,
     });
+
+    // Increment seller's totalSales and update level if needed
+    try {
+      const updatedSeller = await prisma.user.update({
+        where: { id: listing.sellerId },
+        data: { totalSales: { increment: 1 } },
+        select: { totalSales: true },
+      });
+      const newLevel = getSellerLevel(updatedSeller.totalSales);
+      if (newLevel !== sellerLevel) {
+        await prisma.user.update({
+          where: { id: listing.sellerId },
+          data: { sellerLevel: newLevel },
+        });
+      }
+    } catch {
+      // Don't break the order flow if sales count update fails
+    }
 
     // Log wallet transactions for buyer and seller
     await prisma.walletTransaction.createMany({

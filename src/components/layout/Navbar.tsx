@@ -4,26 +4,9 @@ import Link from "next/link";
 import { useSession, signOut } from "next-auth/react";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { Menu, X, Vault, ShoppingBag, LayoutDashboard, LogOut, User, Wallet, Gift, Flame, Eye, Bell, PieChart } from "lucide-react";
+import { Menu, X, Vault, ShoppingBag, LayoutDashboard, LogOut, User, Wallet, Gift, Flame, Eye, Bell, PieChart, Gavel, Calendar } from "lucide-react";
 import { formatPrice } from "@/lib/utils";
-
-interface Notification {
-  id: string;
-  type: string;
-  title: string;
-  message: string;
-  link: string | null;
-  read: boolean;
-  createdAt: string;
-}
-
-function timeAgo(date: string): string {
-  const seconds = Math.floor((Date.now() - new Date(date).getTime()) / 1000);
-  if (seconds < 60) return "just now";
-  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
-  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
-  return `${Math.floor(seconds / 86400)}d ago`;
-}
+import { Notification, timeAgo } from "@/lib/notifications";
 
 export function Navbar() {
   const { data: session } = useSession();
@@ -59,11 +42,11 @@ export function Navbar() {
   }, [session]);
 
   useEffect(() => {
+    if (!session?.user) return;
     fetchNotifications();
-    // Poll every 30 seconds for new notifications
     const interval = setInterval(fetchNotifications, 30000);
     return () => clearInterval(interval);
-  }, [fetchNotifications]);
+  }, [fetchNotifications, session]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -79,14 +62,16 @@ export function Navbar() {
   }, [notifOpen]);
 
   async function markAsRead(id: string) {
-    await fetch(`/api/notifications/${id}`, {
+    const res = await fetch(`/api/notifications/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ read: true }),
-    }).catch(() => {});
-    setNotifications((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, read: true } : n))
-    );
+    }).catch(() => null);
+    if (res?.ok) {
+      setNotifications((prev) =>
+        prev.map((n) => (n.id === id ? { ...n, read: true } : n))
+      );
+    }
   }
 
   async function markAllAsRead() {
@@ -120,6 +105,9 @@ export function Navbar() {
             <Link href="/drops" className="text-sm font-medium hover:text-[var(--accent)] transition-colors">
               Drops
             </Link>
+            <Link href="/releases" className="text-sm font-medium hover:text-[var(--accent)] transition-colors">
+              Releases
+            </Link>
             {session && (
               <>
                 <Link href="/vault" className="text-sm font-medium hover:text-[var(--accent)] transition-colors">
@@ -133,6 +121,9 @@ export function Navbar() {
                 </Link>
                 <Link href="/watchlist" className="text-sm font-medium hover:text-[var(--accent)] transition-colors">
                   Watchlist
+                </Link>
+                <Link href="/bids" className="text-sm font-medium hover:text-[var(--accent)] transition-colors">
+                  My Bids
                 </Link>
                 {/* Notification Bell */}
                 <div className="relative" ref={notifRef}>
@@ -257,6 +248,9 @@ export function Navbar() {
           <Link href="/drops" className="flex items-center gap-2 text-sm py-2" onClick={() => setMobileOpen(false)}>
             <Flame className="h-4 w-4" /> Drops
           </Link>
+          <Link href="/releases" className="flex items-center gap-2 text-sm py-2" onClick={() => setMobileOpen(false)}>
+            <Calendar className="h-4 w-4" /> Releases
+          </Link>
           {session && (
             <>
               <Link href="/vault" className="flex items-center gap-2 text-sm py-2" onClick={() => setMobileOpen(false)}>
@@ -270,6 +264,9 @@ export function Navbar() {
               </Link>
               <Link href="/watchlist" className="flex items-center gap-2 text-sm py-2" onClick={() => setMobileOpen(false)}>
                 <Eye className="h-4 w-4" /> Watchlist
+              </Link>
+              <Link href="/bids" className="flex items-center gap-2 text-sm py-2" onClick={() => setMobileOpen(false)}>
+                <Gavel className="h-4 w-4" /> My Bids
               </Link>
               <Link href="/notifications" className="flex items-center gap-2 text-sm py-2" onClick={() => setMobileOpen(false)}>
                 <Bell className="h-4 w-4" /> Notifications

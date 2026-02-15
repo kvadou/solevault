@@ -12,9 +12,10 @@ export function formatPrice(cents: number): string {
   }).format(cents / 100);
 }
 
-export function calculateFees(priceCents: number) {
-  const buyerFeeCents = Math.round(priceCents * 0.025);
-  const sellerFeeCents = Math.round(priceCents * 0.025);
+export function calculateFees(priceCents: number, sellerFeePercent?: number) {
+  const buyerFeeCents = Math.round(priceCents * 0.025); // buyer fee stays at 2.5%
+  const sellerRate = sellerFeePercent !== undefined ? sellerFeePercent / 100 : 0.025;
+  const sellerFeeCents = Math.round(priceCents * sellerRate);
   const platformRevenueCents = buyerFeeCents + sellerFeeCents;
   const totalBuyerPays = priceCents + buyerFeeCents;
   const sellerReceives = priceCents - sellerFeeCents;
