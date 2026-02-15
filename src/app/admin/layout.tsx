@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Inbox, Package, ShoppingCart, Database, Loader2, Gift, Flame, CalendarDays } from "lucide-react";
+import { LayoutDashboard, Inbox, Package, ShoppingCart, Database, Loader2, Gift, Flame, CalendarDays, ShieldCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const NAV_ITEMS = [
@@ -16,6 +16,7 @@ const NAV_ITEMS = [
   { href: "/admin/drops", label: "Drops", icon: Flame },
   { href: "/admin/releases", label: "Releases", icon: CalendarDays },
   { href: "/admin/orders", label: "Orders", icon: ShoppingCart },
+  { href: "/admin/verifications", label: "Verifications", icon: ShieldCheck },
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
