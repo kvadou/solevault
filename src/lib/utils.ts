@@ -52,6 +52,8 @@ export function statusColor(status: string): string {
     received: "bg-indigo-100 text-indigo-800",
     authenticating: "bg-yellow-100 text-yellow-800",
     rejected: "bg-red-100 text-red-800",
+    verified: "bg-green-100 text-green-800",
+    needs_review: "bg-yellow-100 text-yellow-800",
   };
   return colors[status] || "bg-gray-100 text-gray-800";
 }

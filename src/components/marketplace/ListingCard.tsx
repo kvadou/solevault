@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { ShieldCheck } from "lucide-react";
 import { formatPrice, conditionLabel } from "@/lib/utils";
 import { SellerBadge } from "@/components/ui/SellerBadge";
 import type { SellerLevel } from "@/lib/seller-levels";
@@ -15,6 +16,7 @@ interface ListingCardProps {
       size: string;
       condition: string;
       imageUrls: string[];
+      certificates?: Array<{ id: string; confidenceScore: number | null }>;
       owner?: {
         id: string;
         name: string | null;
@@ -54,6 +56,14 @@ export function ListingCard({ listing }: ListingCardProps) {
             {conditionLabel(vaultItem.condition)}
           </span>
         </div>
+        {vaultItem.certificates && vaultItem.certificates.length > 0 && (
+          <div className="absolute top-2 left-2">
+            <span className="inline-flex items-center gap-1 rounded-full bg-green-500/90 px-2 py-0.5 text-[10px] font-semibold text-white">
+              <ShieldCheck className="h-3 w-3" />
+              Verified
+            </span>
+          </div>
+        )}
       </div>
       <div className="p-3 space-y-1">
         <div className="flex items-center justify-between">

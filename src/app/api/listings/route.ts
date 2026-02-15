@@ -49,6 +49,12 @@ export async function GET(req: Request) {
         include: {
           sneaker: true,
           owner: { select: { id: true, name: true, sellerLevel: true } },
+          certificates: {
+            where: { status: "verified" },
+            select: { id: true, confidenceScore: true },
+            take: 1,
+            orderBy: { verifiedAt: "desc" },
+          },
         },
       },
     },

@@ -12,6 +12,12 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
         include: {
           listings: { where: { status: "active" }, select: { id: true, priceCents: true, createdAt: true } },
           owner: { select: { id: true, name: true } },
+          certificates: {
+            where: { status: "verified" },
+            select: { id: true, confidenceScore: true },
+            take: 1,
+            orderBy: { verifiedAt: "desc" },
+          },
         },
       },
       priceHistory: {

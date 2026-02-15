@@ -5,7 +5,7 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import { Loader2, Shield, Vault, TrendingUp, Heart } from "lucide-react";
+import { Loader2, Shield, ShieldCheck, Vault, TrendingUp, Heart } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
 import { Modal } from "@/components/ui/Modal";
 import { toast } from "@/components/ui/Toast";
@@ -28,6 +28,7 @@ interface SneakerDetail {
     imageUrls: string[];
     listings: Array<{ id: string; priceCents: number; createdAt: string }>;
     owner: { id: string; name: string | null };
+    certificates?: Array<{ id: string; confidenceScore: number | null }>;
   }>;
   priceHistory: Array<{ priceCents: number; recordedAt: string; size: string }>;
   marketStats?: {
@@ -155,7 +156,7 @@ export default function SneakerDetailPage({ params }: { params: Promise<{ id: st
   }
 
   const activeListing = sneaker.vaultItems
-    .flatMap((v) => v.listings.map((l) => ({ ...l, vaultItemId: v.id, size: v.size, condition: v.condition, imageUrls: v.imageUrls })))
+    .flatMap((v) => v.listings.map((l) => ({ ...l, vaultItemId: v.id, size: v.size, condition: v.condition, imageUrls: v.imageUrls, certificateId: v.certificates?.[0]?.id ?? null })))
     .sort((a, b) => a.priceCents - b.priceCents);
 
   const lowestPrice = activeListing[0]?.priceCents;
@@ -230,6 +231,11 @@ export default function SneakerDetailPage({ params }: { params: Promise<{ id: st
                       <Link href={`/certificate/${l.vaultItemId}`} className="text-xs text-[var(--accent)] hover:underline inline-flex items-center gap-1">
                         <Shield className="h-3 w-3" /> Verified
                       </Link>
+                      {l.certificateId && (
+                        <Link href={`/verify/${l.certificateId}`} className="text-xs text-green-600 hover:underline inline-flex items-center gap-1">
+                          <ShieldCheck className="h-3 w-3" /> TrustVault
+                        </Link>
+                      )}
                     </div>
                     <div className="flex items-center gap-3">
                       <span className="font-bold">{formatPrice(l.priceCents)}</span>
