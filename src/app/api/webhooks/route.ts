@@ -92,6 +92,23 @@ export async function POST(req: Request) {
       eventType: "marketplace_sale",
       orderId: order.id,
     });
+
+    // Record price history
+    const vaultItemData = await prisma.vaultItem.findUnique({
+      where: { id: order.vaultItemId },
+      select: { sneakerId: true, size: true },
+    });
+
+    if (vaultItemData) {
+      await prisma.priceHistory.create({
+        data: {
+          sneakerId: vaultItemData.sneakerId,
+          size: vaultItemData.size,
+          priceCents: order.salePriceCents,
+          source: "platform",
+        },
+      });
+    }
   }
 
   return NextResponse.json({ received: true });
