@@ -2,6 +2,36 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 
+export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const session = await auth();
+  if (!session?.user || (session.user as { role?: string }).role !== "admin") {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { id } = await params;
+
+  const item = await prisma.vaultItem.findUnique({
+    where: { id },
+    include: {
+      sneaker: true,
+      owner: { select: { id: true, name: true, email: true } },
+      submission: true,
+      authReport: {
+        include: {
+          checkpoints: { orderBy: { sortOrder: "asc" } },
+          photos: { orderBy: { sortOrder: "asc" } },
+        },
+      },
+    },
+  });
+
+  if (!item) {
+    return NextResponse.json({ error: "Item not found" }, { status: 404 });
+  }
+
+  return NextResponse.json(item);
+}
+
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
   if (!session?.user || (session.user as { role?: string }).role !== "admin") {

@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Loader2, CheckCircle, XCircle, Eye } from "lucide-react";
+import Link from "next/link";
+import { Loader2, CheckCircle, XCircle, Eye, Shield } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
 import { Modal } from "@/components/ui/Modal";
 
@@ -161,6 +162,12 @@ export default function AdminSubmissions() {
                   </div>
                   {item.authenticationStatus === "pending" && (
                     <div className="flex gap-2 pt-1">
+                      <Link
+                        href={`/admin/authenticate/${item.id}`}
+                        className="flex items-center gap-1 rounded bg-[var(--accent)] px-3 py-1 text-xs text-white hover:opacity-90"
+                      >
+                        <Shield className="h-3 w-3" /> Full Authentication
+                      </Link>
                       <button
                         onClick={() => approveVaultItem(item.id)}
                         disabled={updating}
