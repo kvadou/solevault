@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useSession, signOut } from "next-auth/react";
 import { useState, useEffect } from "react";
-import { Menu, X, Vault, ShoppingBag, LayoutDashboard, LogOut, User, Wallet, Gift, Flame } from "lucide-react";
+import { Menu, X, Vault, ShoppingBag, LayoutDashboard, LogOut, User, Wallet, Gift, Flame, Eye } from "lucide-react";
 import { formatPrice } from "@/lib/utils";
 
 export function Navbar() {
@@ -45,6 +45,9 @@ export function Navbar() {
               <>
                 <Link href="/vault" className="text-sm font-medium hover:text-[var(--accent)] transition-colors">
                   My Vault
+                </Link>
+                <Link href="/watchlist" className="text-sm font-medium hover:text-[var(--accent)] transition-colors">
+                  Watchlist
                 </Link>
                 <Link href="/orders" className="text-sm font-medium hover:text-[var(--accent)] transition-colors">
                   Orders
@@ -107,6 +110,9 @@ export function Navbar() {
             <>
               <Link href="/vault" className="flex items-center gap-2 text-sm py-2" onClick={() => setMobileOpen(false)}>
                 <Vault className="h-4 w-4" /> My Vault
+              </Link>
+              <Link href="/watchlist" className="flex items-center gap-2 text-sm py-2" onClick={() => setMobileOpen(false)}>
+                <Eye className="h-4 w-4" /> Watchlist
               </Link>
               <Link href="/orders" className="flex items-center gap-2 text-sm py-2" onClick={() => setMobileOpen(false)}>
                 <ShoppingBag className="h-4 w-4" /> Orders
