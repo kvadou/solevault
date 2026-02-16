@@ -64,7 +64,7 @@ export async function POST(req: Request) {
   });
 
   // Fire-and-forget: process verification asynchronously
-  processVerification(certificate.id, vaultItem.sneaker, imageUrls).catch(
+  processVerification(certificate.id, vaultItem.sneaker, imageUrls, session.user.id).catch(
     (err) => console.error("Verification processing failed:", err)
   );
 
@@ -77,7 +77,8 @@ export async function POST(req: Request) {
 async function processVerification(
   certificateId: string,
   sneaker: { brand: string; model: string; styleCode: string | null },
-  imageUrls: string[]
+  imageUrls: string[],
+  ownerId: string
 ) {
   try {
     const result = await submitForVerification({
@@ -97,6 +98,35 @@ async function processVerification(
         verifiedAt: result.status === "verified" ? new Date() : null,
       },
     });
+
+    // Create notification for the owner
+    const statusMessages: Record<string, { title: string; message: string }> = {
+      verified: {
+        title: "Item Verified!",
+        message: `Your ${sneaker.brand} ${sneaker.model} has been verified authentic with ${result.confidenceScore}% confidence.`,
+      },
+      needs_review: {
+        title: "Verification Needs Review",
+        message: `Your ${sneaker.brand} ${sneaker.model} needs additional review. An admin will check it within 24 hours.`,
+      },
+      failed: {
+        title: "Verification Failed",
+        message: `Your ${sneaker.brand} ${sneaker.model} did not pass verification (score: ${result.confidenceScore}%). You can dispute this result.`,
+      },
+    };
+
+    const msg = statusMessages[result.status];
+    if (msg) {
+      await prisma.notification.create({
+        data: {
+          userId: ownerId,
+          type: "verification",
+          title: msg.title,
+          message: msg.message,
+          link: `/verify/${certificateId}`,
+        },
+      });
+    }
   } catch (err) {
     console.error("Entrupy verification error:", err);
     await prisma.authenticationCertificate.update({
