@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import Image from "next/image";
-import { Camera, Check, ChevronLeft, ChevronRight, X } from "lucide-react";
+import { Camera, Check, ChevronLeft, ChevronRight, Upload, X } from "lucide-react";
 
 const REQUIRED_ANGLES = [
   { key: "left_side", label: "Left Side", description: "Full left profile at eye level" },
@@ -24,6 +24,34 @@ export function PhotoCaptureGuide({ onComplete, onCancel }: PhotoCaptureGuidePro
   const [currentIndex, setCurrentIndex] = useState(0);
   const [photos, setPhotos] = useState<CapturedPhotos>({});
   const [urlInput, setUrlInput] = useState("");
+  const [fileError, setFileError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+
+  function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setFileError(null);
+
+    if (file.size > MAX_FILE_SIZE) {
+      setFileError("File is too large. Maximum size is 10MB.");
+      e.target.value = "";
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = reader.result as string;
+      setPhotos((prev) => ({ ...prev, [currentAngle.key]: dataUrl }));
+      // Auto-advance to next unfilled angle
+      if (currentIndex < REQUIRED_ANGLES.length - 1) {
+        setCurrentIndex(currentIndex + 1);
+      }
+    };
+    reader.readAsDataURL(file);
+    e.target.value = "";
+  }
 
   const completedCount = Object.keys(photos).length;
   const currentAngle = REQUIRED_ANGLES[currentIndex];
@@ -118,12 +146,32 @@ export function PhotoCaptureGuide({ onComplete, onCancel }: PhotoCaptureGuidePro
           )}
         </div>
 
-        {/* URL input for adding photo */}
+        {/* File upload / URL input for adding photo */}
         {!photos[currentAngle.key] && (
-          <div className="p-4 space-y-2">
-            <label className="block text-xs text-[var(--muted-foreground)]">
-              Image URL for {currentAngle.label}
-            </label>
+          <div className="p-4 space-y-3">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              onChange={handleFileSelect}
+              className="hidden"
+            />
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="w-full inline-flex items-center justify-center gap-2 rounded-md bg-[var(--accent)] px-4 py-3 text-sm font-medium text-white hover:opacity-90 transition-opacity"
+            >
+              <Upload className="h-4 w-4" />
+              Take Photo or Choose File
+            </button>
+            {fileError && (
+              <p className="text-xs text-red-500">{fileError}</p>
+            )}
+            <div className="flex items-center gap-2 text-xs text-[var(--muted-foreground)]">
+              <span className="flex-1 border-t border-[var(--border)]" />
+              or enter image URL
+              <span className="flex-1 border-t border-[var(--border)]" />
+            </div>
             <div className="flex gap-2">
               <input
                 type="url"
@@ -131,12 +179,12 @@ export function PhotoCaptureGuide({ onComplete, onCancel }: PhotoCaptureGuidePro
                 onChange={(e) => setUrlInput(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleAddPhoto()}
                 placeholder="https://..."
-                className="flex-1 rounded-md border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
+                className="flex-1 rounded-md border border-[var(--border)] bg-[var(--muted)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
               />
               <button
                 onClick={handleAddPhoto}
                 disabled={!urlInput.trim()}
-                className="rounded-md bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white hover:opacity-90 transition-opacity disabled:opacity-50"
+                className="rounded-md bg-[var(--muted)] px-4 py-2 text-sm font-medium text-[var(--foreground)] hover:bg-[var(--border)] transition-colors disabled:opacity-50"
               >
                 Add
               </button>
