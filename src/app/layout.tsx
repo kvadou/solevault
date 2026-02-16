@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { SessionProvider } from "@/components/layout/SessionProvider";
 import { Navbar } from "@/components/layout/Navbar";
+import { SectionLayout } from "@/components/layout/SectionLayout";
 import { ToastProvider } from "@/components/ui/Toast";
 import "./globals.css";
 
@@ -16,7 +17,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <SessionProvider>
           <ToastProvider>
             <Navbar />
-            <main className="min-h-[calc(100vh-64px)]">{children}</main>
+            <main className="min-h-[calc(100vh-64px)]">
+              <SectionLayout>{children}</SectionLayout>
+            </main>
           </ToastProvider>
         </SessionProvider>
       </body>
