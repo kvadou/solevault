@@ -10,6 +10,7 @@ import { toast } from "@/components/ui/Toast";
 import { Badge } from "@/components/ui/Badge";
 import { Modal } from "@/components/ui/Modal";
 import { formatPrice, conditionLabel } from "@/lib/utils";
+import { PhotoCaptureGuide, type CapturedPhotos } from "@/components/verify/PhotoCaptureGuide";
 
 interface PricingGuidance {
   suggestedLowCents: number;
@@ -105,6 +106,9 @@ export default function VaultPage() {
   } | null>(null);
   const [listCondition, setListCondition] = useState("excellent");
   const [listConditionNotes, setListConditionNotes] = useState("");
+  const [verifyItem, setVerifyItem] = useState<VaultItem | null>(null);
+  const [verifying, setVerifying] = useState(false);
+  const [verifyResult, setVerifyResult] = useState<string | null>(null);
 
   useEffect(() => {
     if (status === "unauthenticated") router.push("/auth/signin");
@@ -248,6 +252,34 @@ export default function VaultPage() {
       toast(`Failed to ${action} bid`, "error");
     }
     setBidActionId(null);
+  }
+
+  async function handleVerifySubmit(photos: CapturedPhotos) {
+    if (!verifyItem) return;
+    setVerifying(true);
+    try {
+      const res = await fetch("/api/verify/submit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          vaultItemId: verifyItem.id,
+          imageUrls: Object.values(photos),
+        }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setVerifyResult(data.certificateId);
+        toast("Verification submitted successfully!", "success");
+        // Refresh vault items
+        const refreshed = await fetch("/api/vault").then((r) => r.json());
+        setItems(refreshed);
+      } else {
+        toast(data.error || "Failed to submit verification", "error");
+      }
+    } catch {
+      toast("Failed to submit verification", "error");
+    }
+    setVerifying(false);
   }
 
   if (loading) {
@@ -521,6 +553,14 @@ export default function VaultPage() {
                       >
                         <DollarSign className="h-3.5 w-3.5" /> Buyback
                       </button>
+                      {item.authenticationStatus !== "authenticated" && (
+                        <button
+                          onClick={() => { setVerifyItem(item); setVerifyResult(null); }}
+                          className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-md border border-green-500 px-3 py-1.5 text-sm font-medium text-green-600 hover:bg-green-50 transition-colors"
+                        >
+                          <ShieldCheck className="h-3.5 w-3.5" /> Verify
+                        </button>
+                      )}
                     </>
                   )}
                   {item.status === "listed" && (
@@ -620,6 +660,52 @@ export default function VaultPage() {
               </button>
             </div>
           </div>
+        )}
+      </Modal>
+
+      {/* Verify Now modal */}
+      <Modal
+        open={!!verifyItem}
+        onClose={() => { if (!verifying) { setVerifyItem(null); setVerifyResult(null); } }}
+        title={verifyResult ? undefined : "Verify Your Sneaker"}
+        className="max-w-2xl"
+      >
+        {verifyItem && (
+          verifyResult ? (
+            <div className="text-center py-6 space-y-4">
+              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-green-100 mx-auto">
+                <ShieldCheck className="h-8 w-8 text-green-600" />
+              </div>
+              <h2 className="text-xl font-semibold">Verification Submitted</h2>
+              <p className="text-sm text-[var(--muted-foreground)]">
+                Your {verifyItem.sneaker.brand} {verifyItem.sneaker.model} has been submitted for verification. You&apos;ll be notified when the results are ready.
+              </p>
+              <Link
+                href={`/verify/${verifyResult}`}
+                className="inline-flex items-center gap-2 rounded-md bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white hover:opacity-90 transition-opacity"
+              >
+                <ShieldCheck className="h-4 w-4" />
+                View Trust Profile
+              </Link>
+            </div>
+          ) : (
+            <div>
+              <p className="text-sm text-[var(--muted-foreground)] mb-4">
+                {verifyItem.sneaker.brand} {verifyItem.sneaker.model} — Size {verifyItem.size}
+              </p>
+              {verifying ? (
+                <div className="flex flex-col items-center justify-center py-12 gap-3">
+                  <Loader2 className="h-8 w-8 animate-spin text-[var(--accent)]" />
+                  <p className="text-sm text-[var(--muted-foreground)]">Submitting for verification...</p>
+                </div>
+              ) : (
+                <PhotoCaptureGuide
+                  onComplete={handleVerifySubmit}
+                  onCancel={() => { setVerifyItem(null); setVerifyResult(null); }}
+                />
+              )}
+            </div>
+          )
         )}
       </Modal>
 
