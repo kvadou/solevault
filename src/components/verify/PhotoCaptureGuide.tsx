@@ -49,6 +49,9 @@ export function PhotoCaptureGuide({ onComplete, onCancel }: PhotoCaptureGuidePro
         setCurrentIndex(currentIndex + 1);
       }
     };
+    reader.onerror = () => {
+      setFileError("Failed to read file. Please try again.");
+    };
     reader.readAsDataURL(file);
     e.target.value = "";
   }
@@ -153,7 +156,6 @@ export function PhotoCaptureGuide({ onComplete, onCancel }: PhotoCaptureGuidePro
               ref={fileInputRef}
               type="file"
               accept="image/*"
-              capture="environment"
               onChange={handleFileSelect}
               className="hidden"
             />

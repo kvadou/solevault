@@ -6,12 +6,11 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import { Loader2, Shield, ShieldCheck, Vault, TrendingUp, Heart } from "lucide-react";
-import { Badge } from "@/components/ui/Badge";
 import { Modal } from "@/components/ui/Modal";
-import { SlideOver } from "@/components/ui/SlideOver";
 import { toast } from "@/components/ui/Toast";
+import { VerificationPreview, useVerificationPreview } from "@/components/verify/VerificationPreview";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
-import { formatPrice, conditionLabel, calculateFees, statusColor } from "@/lib/utils";
+import { formatPrice, conditionLabel, calculateFees } from "@/lib/utils";
 
 interface SneakerDetail {
   id: string;
@@ -60,20 +59,7 @@ export default function SneakerDetailPage({ params }: { params: Promise<{ id: st
   const [bidSize, setBidSize] = useState("");
   const [bidAmount, setBidAmount] = useState("");
   const [bidding, setBidding] = useState(false);
-  const [showVerification, setShowVerification] = useState(false);
-  const [certData, setCertData] = useState<Record<string, unknown> | null>(null);
-  const [loadingCert, setLoadingCert] = useState(false);
-
-  function handleOpenVerification(certificateId: string) {
-    setShowVerification(true);
-    setLoadingCert(true);
-    setCertData(null);
-    fetch(`/api/verify/certificate/${certificateId}`)
-      .then((r) => r.json())
-      .then((data) => setCertData(data))
-      .catch(() => setCertData(null))
-      .finally(() => setLoadingCert(false));
-  }
+  const { showVerification, certData, loadingCert, openPreview, closePreview } = useVerificationPreview();
 
   useEffect(() => {
     fetch(`/api/sneakers/${id}`)
@@ -248,7 +234,7 @@ export default function SneakerDetailPage({ params }: { params: Promise<{ id: st
                       </Link>
                       {l.certificateId && (
                         <button
-                          onClick={() => handleOpenVerification(l.certificateId!)}
+                          onClick={() => openPreview(l.certificateId!)}
                           className="text-xs text-green-600 hover:underline inline-flex items-center gap-1"
                         >
                           <ShieldCheck className="h-3 w-3" /> TrustVault
@@ -460,67 +446,12 @@ export default function SneakerDetailPage({ params }: { params: Promise<{ id: st
       </Modal>
 
       {/* Verification preview slide-over */}
-      <SlideOver
+      <VerificationPreview
         open={showVerification}
-        onClose={() => setShowVerification(false)}
-        title="Verification Details"
-      >
-        {loadingCert ? (
-          <div className="flex items-center justify-center py-12">
-            <Loader2 className="h-6 w-6 animate-spin text-[var(--muted-foreground)]" />
-          </div>
-        ) : certData && "certificate" in certData ? (
-          <div className="space-y-6">
-            {/* Confidence score */}
-            <div className="text-center">
-              <p className="text-5xl font-bold">
-                {String((certData.certificate as Record<string, unknown>).confidenceScore ?? "—")}
-                <span className="text-lg font-normal text-[var(--muted-foreground)]">%</span>
-              </p>
-              <p className="text-sm text-[var(--muted-foreground)] mt-1">Confidence Score</p>
-            </div>
-
-            {/* Status & date */}
-            <div className="flex items-center justify-center gap-3">
-              <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${statusColor(String((certData.certificate as Record<string, unknown>).status ?? ""))}`}>
-                {String((certData.certificate as Record<string, unknown>).status ?? "")}
-              </span>
-              {typeof (certData.certificate as Record<string, unknown>).verifiedAt === "string" && (
-                <span className="text-xs text-[var(--muted-foreground)]">
-                  {new Date(String((certData.certificate as Record<string, unknown>).verifiedAt)).toLocaleDateString()}
-                </span>
-              )}
-            </div>
-
-            {/* Submitted photos */}
-            {Array.isArray((certData.certificate as Record<string, unknown>).imageUrls) &&
-              ((certData.certificate as Record<string, unknown>).imageUrls as string[]).length > 0 && (
-              <div>
-                <h3 className="text-sm font-medium mb-2">Submitted Photos</h3>
-                <div className="grid grid-cols-3 gap-2">
-                  {((certData.certificate as Record<string, unknown>).imageUrls as string[]).map((url, i) => (
-                    <div key={i} className="aspect-square relative rounded-md overflow-hidden bg-[var(--muted)]">
-                      <Image src={url} alt={`Photo ${i + 1}`} fill className="object-cover" sizes="120px" />
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* View full trust profile link */}
-            <Link
-              href={`/verify/${(certData.certificate as Record<string, unknown>).id}`}
-              className="block w-full text-center rounded-md bg-[var(--accent)] px-4 py-2.5 text-sm font-medium text-white hover:opacity-90 transition-opacity"
-            >
-              View Full Trust Profile
-            </Link>
-          </div>
-        ) : (
-          <p className="text-sm text-[var(--muted-foreground)] text-center py-8">
-            Unable to load verification details.
-          </p>
-        )}
-      </SlideOver>
+        onClose={closePreview}
+        certData={certData}
+        loading={loadingCert}
+      />
     </div>
   );
 }

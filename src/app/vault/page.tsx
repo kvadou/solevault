@@ -270,9 +270,13 @@ export default function VaultPage() {
       if (res.ok) {
         setVerifyResult(data.certificateId);
         toast("Verification submitted successfully!", "success");
-        // Refresh vault items
-        const refreshed = await fetch("/api/vault").then((r) => r.json());
-        setItems(refreshed);
+        // Refresh vault items (don't let failure here mask success)
+        try {
+          const refreshed = await fetch("/api/vault").then((r) => r.json());
+          setItems(refreshed);
+        } catch {
+          // Refresh failed but verification was submitted successfully
+        }
       } else {
         toast(data.error || "Failed to submit verification", "error");
       }
