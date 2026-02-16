@@ -77,7 +77,7 @@ export async function POST(req: Request) {
         confidenceScore: result.confidenceScore,
         status: result.status,
         resultData: result.resultData as Prisma.InputJsonValue,
-        verifiedAt: new Date(),
+        verifiedAt: result.status === "verified" ? new Date() : null,
       },
     });
 

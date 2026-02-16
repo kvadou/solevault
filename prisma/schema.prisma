@@ -369,7 +369,7 @@ model AuthenticationCertificate {
   provider         String    @default("entrupy") // "entrupy" | "manual"
   externalCertId   String?
   confidenceScore  Int?      // 0-100
-  status           String    @default("pending") // "pending" | "verified" | "needs_review" | "failed"
+  status           String    @default("pending") // "pending" | "verified" | "needs_review" | "failed" | "disputed"
   imageUrls        String[]
   resultData       Json?
   verifiedAt       DateTime?

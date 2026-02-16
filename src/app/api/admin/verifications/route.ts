@@ -15,7 +15,9 @@ export async function GET(req: Request) {
   const status = searchParams.get("status") || "needs_review";
 
   const where =
-    status === "all" ? {} : { status };
+    status === "all"
+      ? { status: { in: ["needs_review", "failed", "disputed"] } }
+      : { status };
 
   const certificates = await prisma.authenticationCertificate.findMany({
     where,
@@ -42,7 +44,7 @@ export async function GET(req: Request) {
         },
       },
     },
-    orderBy: { createdAt: "desc" },
+    orderBy: { createdAt: "asc" },
   });
 
   return NextResponse.json({ certificates });
