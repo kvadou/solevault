@@ -10,8 +10,15 @@ export async function POST(req: Request) {
   try {
     const rawBody = await req.text();
 
-    // Verify HMAC-SHA256 signature if secret is configured
-    if (ENTRUPY_WEBHOOK_SECRET) {
+    // Verify HMAC-SHA256 signature — hard fail if secret not configured
+    if (!ENTRUPY_WEBHOOK_SECRET) {
+      console.error("ENTRUPY_WEBHOOK_SECRET not configured");
+      return NextResponse.json(
+        { error: "Webhook secret not configured" },
+        { status: 500 }
+      );
+    }
+    {
       const signature = req.headers.get("x-entrupy-signature");
       if (!signature) {
         return NextResponse.json(
