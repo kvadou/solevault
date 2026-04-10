@@ -1,3 +1,4 @@
+import "@/env";
 import type { Metadata } from "next";
 import { SessionProvider } from "@/components/layout/SessionProvider";
 import { Navbar } from "@/components/layout/Navbar";

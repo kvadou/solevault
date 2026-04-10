@@ -16,6 +16,7 @@
     "@prisma/client": "^6.19.2",
     "@sentry/nextjs": "^10.48.0",
     "@stripe/stripe-js": "^8.7.0",
+    "@t3-oss/env-nextjs": "^0.13.11",
     "@tailwindcss/postcss": "^4.1.18",
     "@types/node": "^25.2.3",
     "@types/react": "^19.2.14",
@@ -34,7 +35,8 @@
     "stripe": "^20.3.1",
     "tailwind-merge": "^3.4.0",
     "tailwindcss": "^4.1.18",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
