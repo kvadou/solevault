@@ -5,6 +5,7 @@ export async function GET() {
   const tiers = await prisma.packTier.findMany({
     where: { status: { in: ["active", "sold_out"] }, dropId: null },
     orderBy: { priceCents: "asc" },
+    take: 100,
     include: {
       poolItems: {
         where: { status: "available" },

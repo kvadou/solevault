@@ -29,6 +29,7 @@ export async function GET() {
         },
       },
     },
+    take: 100,
   });
 
   return NextResponse.json(drops);

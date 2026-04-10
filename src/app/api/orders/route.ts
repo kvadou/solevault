@@ -23,6 +23,7 @@ export async function GET() {
       seller: { select: { id: true, name: true } },
     },
     orderBy: { createdAt: "desc" },
+    take: 100,
   });
 
   return NextResponse.json(orders);

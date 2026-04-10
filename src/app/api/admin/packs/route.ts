@@ -18,6 +18,7 @@ export async function GET() {
         },
       },
     },
+    take: 1000,
   });
 
   return NextResponse.json(tiers);

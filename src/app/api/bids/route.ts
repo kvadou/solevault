@@ -44,6 +44,7 @@ export async function GET(req: Request) {
         bidder: { select: { name: true } },
       },
       orderBy: { createdAt: "desc" },
+      take: 100,
     });
 
     return NextResponse.json(bids);
@@ -58,6 +59,7 @@ export async function GET(req: Request) {
       },
     },
     orderBy: { createdAt: "desc" },
+    take: 100,
   });
 
   return NextResponse.json(bids);

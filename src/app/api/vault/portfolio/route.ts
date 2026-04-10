@@ -27,6 +27,7 @@ export async function GET() {
         },
       },
     },
+    take: 500,
   });
 
   if (vaultItems.length === 0) {

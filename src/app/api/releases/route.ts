@@ -15,6 +15,7 @@ export async function GET() {
       reminders: userId ? { where: { userId }, select: { id: true } } : false,
     },
     orderBy: { releaseDate: "asc" },
+    take: 100,
   });
 
   return NextResponse.json(

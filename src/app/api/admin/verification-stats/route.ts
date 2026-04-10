@@ -49,6 +49,7 @@ export async function GET() {
     where: { createdAt: { gte: sixMonthsAgo } },
     select: { createdAt: true, status: true },
     orderBy: { createdAt: "asc" },
+    take: 1000,
   });
 
   const monthlyMap = new Map<

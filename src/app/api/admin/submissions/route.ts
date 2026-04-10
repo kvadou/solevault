@@ -14,6 +14,7 @@ export async function GET() {
       vaultItems: { include: { sneaker: true } },
     },
     orderBy: { createdAt: "desc" },
+    take: 1000,
   });
 
   return NextResponse.json(submissions);

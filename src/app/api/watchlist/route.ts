@@ -28,6 +28,7 @@ export async function GET() {
       },
     },
     orderBy: { createdAt: "desc" },
+    take: 100,
   });
 
   // Flatten to a cleaner response

@@ -14,6 +14,7 @@ export async function GET() {
       sneaker: { select: { id: true, brand: true, model: true, imageUrl: true } },
       _count: { select: { reminders: true } },
     },
+    take: 1000,
   });
 
   return NextResponse.json(releases);

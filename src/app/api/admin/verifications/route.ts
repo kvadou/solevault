@@ -45,6 +45,7 @@ export async function GET(req: Request) {
       },
     },
     orderBy: { createdAt: "asc" },
+    take: 1000,
   });
 
   return NextResponse.json({ certificates });

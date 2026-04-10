@@ -27,6 +27,7 @@ export async function GET(req: Request) {
       listings: { where: { status: "active" } },
     },
     orderBy: { createdAt: "desc" },
+    take: 500,
   });
 
   return NextResponse.json(items);

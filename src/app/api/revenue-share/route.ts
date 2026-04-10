@@ -36,6 +36,7 @@ export async function GET() {
     where: { originalVaulterId: session.user.id! },
     include: { sneaker: true },
     orderBy: { createdAt: "desc" },
+    take: 500,
   });
 
   // Get lifetime revenue generated per item
